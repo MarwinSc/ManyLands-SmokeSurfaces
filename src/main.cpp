@@ -46,6 +46,9 @@
 // Boost
 #include <boost/numeric/ublas/assignment.hpp>
 
+//MarwinTest
+#include "Trajectory_generator.h"
+
 //#define DEBUG
 
 #if defined(USE_GL_ES3)
@@ -317,20 +320,26 @@ void mainloop()
     // ImGui windows start
     {
         static float tesseract_thickness = 3.f,
-                     curve_thickness = 3.f,
-                     sphere_diameter = 3.f,
-                     camera_3D_dist  = 3.f,
-                     xy_rot = 0.f,
-                     yz_rot = 0.f,
-                     zx_rot = 0.f,
-                     xw_rot = 0.f,
-                     yw_rot = 0.f,
-                     zw_rot = 0.f,
-                     fov_4d[3] = { 30.f * static_cast<float>(DEG_TO_RAD),
-                                   30.f * static_cast<float>(DEG_TO_RAD),
-                                   30.f * static_cast<float>(DEG_TO_RAD) },
-                     fog_dist = 10.f,
-                     fog_range = 2.f;
+                    curve_thickness = 3.f,
+                    sphere_diameter = 3.f,
+                    camera_3D_dist = 3.f,
+                    xy_rot = 0.f,
+                    yz_rot = 0.f,
+                    zx_rot = 0.f,
+                    xw_rot = 0.f,
+                    yw_rot = 0.f,
+                    zw_rot = 0.f,
+                    fov_4d[3] = { 30.f * static_cast<float>(DEG_TO_RAD),
+                                  30.f * static_cast<float>(DEG_TO_RAD),
+                                  30.f * static_cast<float>(DEG_TO_RAD) },
+                    fog_dist = 10.f,
+                    fog_range = 2.f,
+                    parameter_a = 28.0f,
+                    parameter_b = 10.0f,
+                    parameter_c = 0.375f,
+                    parameter_x = 28.0f,
+                    parameter_y = 10.0f,
+                    parameter_z = 0.375f;
 
         ImGui::SetNextWindowSize(ImVec2(static_cast<float>(Left_panel_size),
                                         static_cast<float>(height)));
@@ -617,6 +626,30 @@ void mainloop()
                         State->stat_max_movement,
                         State->stat_max_value);
                 }
+            }
+        }
+
+
+        //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        //Marwins Debug
+        //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+        if (ImGui::CollapsingHeader("Debug"))
+        {
+            ImGui::Text("Lorenz: ");
+            ImGui::SliderFloat("rho", &parameter_a, -30.0f, 30.f);
+            ImGui::SliderFloat("sigma", &parameter_b, -10.0f, 10.f);
+            ImGui::SliderFloat("beta", &parameter_c, -10.0f, 10.f);
+
+            ImGui::SliderFloat("x", &parameter_x, -10.0f, 10.f);
+            ImGui::SliderFloat("y", &parameter_y, -10.0f, 10.f);
+            ImGui::SliderFloat("z", &parameter_z, -10.0f, 10.f);
+
+            if (ImGui::Button("Create_Curve")) {
+                Scene_objs.create_ode(parameter_a,parameter_b,parameter_c, parameter_x, parameter_y, parameter_z, Curve_max_deviation);
+            }
+            if (ImGui::Button("Clear")) {
+                State->curves.clear();
             }
         }
 

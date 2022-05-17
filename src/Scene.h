@@ -12,6 +12,8 @@ public:
         const std::vector<std::string>& fnames,
         float cuve_min_rad,
         float tesseract_size = 200.f);
+    std::shared_ptr<Curve> create_ode(float a, float b, float c, float x, float y, float z, float cuve_min_rad, float tesseract_size = 200.f);
+
 
 private:
     std::shared_ptr<Curve> load_curve(std::string fname);

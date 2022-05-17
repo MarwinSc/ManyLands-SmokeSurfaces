@@ -9,6 +9,8 @@
 #include <boost/numeric/ublas/vector.hpp>
 #include <boost/numeric/ublas/assignment.hpp>
 
+#include "Trajectory_generator.h"
+
 //******************************************************************************
 // Scene
 //******************************************************************************
@@ -115,6 +117,103 @@ void Scene::load_ode(
         state_->curve_selection->t_start = first_curve->t_min();
         state_->curve_selection->t_end = first_curve->t_max();
     }
+}
+
+//******************************************************************************
+// create ode
+// generates trajectories during runtime
+//******************************************************************************
+
+std::shared_ptr<Curve> Scene::create_ode(float a, float b, float c, float x, float y, float z, float cuve_min_rad, float tesseract_size/* = 200.f*/) {
+
+    //++
+    /*
+    assert(state_);
+    if (state_ == nullptr)
+    return;
+    */
+
+    // Remove all previous curves
+    //state_->curves.clear();
+    
+    // Reset size of the tesseract
+    for (auto& s : state_->tesseract_size)
+    s = tesseract_size;
+
+    // The aggregative origin and size for all curves
+    Scene_vertex_t total_origin(5), total_size(5);
+    for (char i = 0; i < 5; ++i)
+    {
+        total_origin(i) = std::numeric_limits<float>::max();
+        total_size(i) = std::numeric_limits<float>::min();
+    }
+    //--
+
+    auto curve = std::make_shared<Curve>();
+    auto tg = std::make_unique<Trajectory_generator>();
+
+    std::vector<float> vars{ a,b,c,x,y,z };
+
+    std::vector<double> coordinates = tg->lorenz(vars);
+    Scene_vertex_t p(5);
+
+    for (int i = 0; i < coordinates.size() - 5; i += 5) {
+
+        p <<= coordinates.at(i + 1), coordinates.at(i + 2), coordinates.at(i + 3), coordinates.at(i + 4), 1;
+        float t = coordinates.at(i);
+        curve->add_point(p, t);
+    }
+
+    Scene_vertex_t origin, size;
+    curve->get_boundaries(origin, size);
+
+    for (char i = 0; i < 5; ++i)
+    {
+        if (total_origin(i) > origin(i)) total_origin(i) = origin(i);
+        if (total_size(i) < size(i)) total_size(i) = size(i);
+    }
+
+    if (!state_->scale_tesseract)
+    {
+        float max_size = std::numeric_limits<float>::min();
+        for (char i = 0; i < 4; ++i)
+        {
+            if (max_size < total_size(i)) max_size = total_size(i);
+        }
+
+        for (char i = 0; i < 4; ++i)
+        {
+            state_->tesseract_size[i] =
+                tesseract_size * total_size[i] / max_size;
+        }
+    }
+
+    Scene_vertex_t scale(5);
+    scale[0] = state_->tesseract_size[0] / total_size[0];
+    scale[1] = state_->tesseract_size[1] / total_size[1];
+    scale[2] = state_->tesseract_size[2] / total_size[2];
+    scale[3] = state_->tesseract_size[3] / total_size[3];
+    scale[4] = 1;
+    
+    curve->translate_vertices(-0.5f * total_size - total_origin);
+    curve->scale_vertices(scale);
+
+    curve = std::make_shared<Curve>(curve->get_simpified_curve(cuve_min_rad));
+    curve->update_stats(
+        state_->stat_kernel_size,
+        state_->stat_max_movement,
+        state_->stat_max_value);
+
+    state_->curves.push_back(std::move(curve));
+
+    create_tesseract();
+    auto& first_curve = state_->curves.front();
+    state_->curve_selection = std::make_unique<Curve_selection>();
+    state_->curve_selection->t_start = first_curve->t_min();
+    state_->curve_selection->t_end = first_curve->t_max();
+
+    return curve;
+
 }
 
 //******************************************************************************

@@ -140,6 +140,8 @@ void Diffuse_shader::draw_geometry(
                           GL_FALSE,
                           stride,
                           ptr2);
+    //TODO remove again:
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     glDrawElements(GL_TRIANGLES,
                    static_cast<GLsizei>(geom->indices.size()),
