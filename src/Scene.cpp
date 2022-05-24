@@ -10,6 +10,7 @@
 #include <boost/numeric/ublas/assignment.hpp>
 
 #include "Trajectory_generator.h"
+#include "Streamsurface.h"
 
 //******************************************************************************
 // Scene
@@ -297,3 +298,106 @@ void Scene::create_tesseract()
         state_->get_color(Z_axis),
         state_->get_color(W_axis));
 }
+
+//******************************************************************************
+// create_surface
+//******************************************************************************
+
+void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<double>> &initial, float tesseract_size/* = 200.f*/)
+{
+    // Reset size of the tesseract
+    for (auto& s : state_->tesseract_size)
+        s = tesseract_size;
+
+    auto tg = std::make_unique<Trajectory_generator>();
+    auto trajectories = std::make_unique<std::vector<std::vector<double>>>();
+    auto surface = std::make_shared<Streamsurface>();
+
+    // The aggregative origin and size for all curves
+    Scene_vertex_t total_origin(5), total_size(5);
+    for (char i = 0; i < 5; ++i)
+    {
+        total_origin(i) = std::numeric_limits<float>::max();
+        total_size(i) = std::numeric_limits<float>::min();
+    }
+
+    //calculate trajectories
+    for (std::vector<double> p : initial) {
+
+        //concatenate initial coordinates to the system parameters 
+        // TODO currently only x,y,z
+        std::vector<float> temp_vars(vars);
+        temp_vars.push_back(p.at(0));
+        temp_vars.push_back(p.at(1));
+        temp_vars.push_back(p.at(2));
+
+        std::vector<double> trajectory = tg->lorenz(temp_vars);
+        //mean of trajectory
+        //auto const count = static_cast<double>(trajectory.size());
+        //auto mean = std::reduce(trajectory.begin(), trajectory.end()) / count;
+
+        trajectories->push_back(trajectory);
+
+    }
+    //create Streamsurface object
+    //TODO remove -20
+    int minimum = 1000;
+    for (int i = 0; i < trajectories->size(); i++) {
+        if (trajectories->at(i).size() < minimum) {
+            minimum = trajectories->at(i).size();
+        }
+    }
+
+    for (int i = 0; i < minimum; i+=5) {
+        std::vector<Scene_vertex_t> points;
+        for (int ii = 0; ii < trajectories->size(); ii++) {
+            Scene_vertex_t p(5);
+            p <<= trajectories->at(ii).at(i + 1), trajectories->at(ii).at(i + 2), trajectories->at(ii).at(i + 3), trajectories->at(ii).at(i + 4), 1;
+            points.push_back(p);
+        }
+        float t = trajectories->at(0).at(i);
+        surface->add_point_strip(points, t);
+    }
+
+    //origin and size
+    Scene_vertex_t origin, size;
+    surface->get_boundaries(origin, size);
+    for (char i = 0; i < 5; ++i)
+    {
+        if (total_origin(i) > origin(i)) total_origin(i) = origin(i);
+        if (total_size(i) < size(i)) total_size(i) = size(i);
+    }
+
+    //surfaces.push_back(std::move(surface));
+
+    //scale
+    if (!state_->scale_tesseract)
+    {
+        float max_size = std::numeric_limits<float>::min();
+        for (char i = 0; i < 4; ++i)
+        {
+            if (max_size < total_size(i)) max_size = total_size(i);
+        }
+
+        for (char i = 0; i < 4; ++i)
+        {
+            state_->tesseract_size[i] = tesseract_size * total_size[i] / max_size;
+        }
+    }
+
+    Scene_vertex_t scale(5);
+    scale[0] = state_->tesseract_size[0] / total_size[0];
+    scale[1] = state_->tesseract_size[1] / total_size[1];
+    scale[2] = state_->tesseract_size[2] / total_size[2];
+    scale[3] = state_->tesseract_size[3] / total_size[3];
+    scale[4] = 1;
+
+    surface->translate_vertices(-0.5f * total_size - total_origin);
+    surface->scale_vertices(scale);
+
+    state_->surfaces.push_back(std::move(surface));
+
+    create_tesseract();
+
+}
+

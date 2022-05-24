@@ -7,6 +7,8 @@
 // boost
 #include <boost/numeric/ublas/matrix.hpp>
 
+#include "Streamsurface.h"
+
 namespace Mesh_generator
 {
 Mesh cylinder(
@@ -61,5 +63,7 @@ void sphere(
     const glm::vec3& position,
     const glm::vec4& color,
     Mesh& mesh);
+
+void surface(Streamsurface& s, Mesh& surface_mesh);
 
 } // namespace Mesh_generator

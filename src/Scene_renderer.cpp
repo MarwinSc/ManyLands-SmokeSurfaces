@@ -69,7 +69,8 @@ void Scene_renderer::render()
     
     if(state_            == nullptr ||
        state_->tesseract == nullptr ||
-       state_->curves.empty())
+       state_->curves.empty()       &&
+       state_->surfaces.empty())
     {
         return;
     }
@@ -167,6 +168,16 @@ void Scene_renderer::render()
         // Draw tesseract
         if(state_->show_tesseract)
             draw_tesseract(projected_t);
+
+        //-----------------------------------------------------------
+        if (!state_->surfaces.empty()) {
+            std::vector<Streamsurface> projected_streamsurface;
+            projected_streamsurface.push_back(*state_->surfaces.at(0).get());
+
+            project_to_3D(projected_streamsurface[0].get_vertices(), rot_m);
+            draw_surface(projected_streamsurface[0]);
+        }
+        //-----------------------------------------------------------
 
         // Draw 4D curve
         if(state_->show_curve)
@@ -487,8 +498,14 @@ void Scene_renderer::project_to_3D(
     tmp_vert = prod(tmp_vert, state_->projection_4D);
 
     //if(tmp_vert(3) < 0)
-    //    gui_.distanceWarning->show();
-    assert(tmp_vert(3) > 0);
+        //gui_.distanceWarning->show();
+    //assert(tmp_vert(3) > 0);
+    if (tmp_vert(3) < 0) {
+        //std::cout << "tmp_vert(3) < 0" << std::endl;
+        tmp_vert(3) = 10.0;
+    }
+    //TODO
+
 
     tmp_vert(0) /= tmp_vert(4);
     tmp_vert(1) /= tmp_vert(4);
@@ -1423,4 +1440,18 @@ void Scene_renderer::draw_labels_in_2D(const glm::mat4& projection)
             points[5].x,
             points[5].y),
         std::string("W"));
+}
+
+//******************************************************************************
+// draw_surface
+//******************************************************************************
+
+void Scene_renderer::draw_surface(Streamsurface &s) {
+
+    Mesh surface_mesh;
+    Mesh_generator::surface(s, surface_mesh);
+
+    diffuse_shader_->append_to_geometry(*front_geometry_.get(), surface_mesh);
+    //diffuse_shader_->append_to_geometry(*back_geometry_.get(), surface_mesh);
+
 }

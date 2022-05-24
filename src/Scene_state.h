@@ -13,6 +13,8 @@
 // std
 #include <map>
 
+#include "Streamsurface.h"
+
 enum Scene_color : std::int32_t
 {
     Background,
@@ -47,6 +49,8 @@ public:
 
     std::vector<std::shared_ptr<Curve>> curves;
     std::shared_ptr<Curve_selection> curve_selection;
+
+    std::vector<std::shared_ptr<Streamsurface>> surfaces;
 
     std::shared_ptr<Tesseract> tesseract;
 

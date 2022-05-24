@@ -8,6 +8,8 @@
 
 #include <cassert>
 
+#include "Streamsurface.h"
+
 //******************************************************************************
 // cylinder
 //******************************************************************************
@@ -299,7 +301,7 @@ void Mesh_generator::sphere(
 
     for(unsigned int i = 0; i < segments; ++i)
     {
-        for(unsigned int j = 0; j < rings; ++j)
+        for (unsigned int j = 0; j < rings; ++j)
         {
             Mesh::Object::FaceType& f1 = object.faces[2 * (i * rings + j)];
             f1.emplace_back(Mesh::Vertex(vert_index(i, j), norm_index(i, j)));
@@ -319,4 +321,71 @@ void Mesh_generator::sphere(
     }
 
     mesh.objects.push_back(object);
+}
+
+//******************************************************************************
+// surface
+//******************************************************************************
+
+void Mesh_generator::surface(Streamsurface &s, Mesh &surface_mesh) {
+
+    surface_mesh.colors.push_back(glm::vec4(1.0, 0.0, 0.0, 0.7));
+
+    Mesh::Object surface_mesh_object;
+
+    //set distance threshold for edges
+    auto v1 = s.get_vertices().at(0);
+    auto v2 = s.get_vertices().at(1);
+    float distance_threshold = glm::distance(glm::vec3(v1(0), v1(1), v1(2)), glm::vec3(v2(0), v2(1), v2(2))) * 10;
+    
+    for (int i = 0; i < s.get_vertices().size(); i++) {
+        auto current = s.get_vertices().at(i);
+        surface_mesh.vertices.push_back(glm::vec3(current(0), current(1), current(2)));
+        glm::vec3 normal = glm::vec3(0.0,1.0,0.0);
+
+        //After first vertex strip AND not the last vertex of the strip
+        if (i >= s.length && i % s.length != s.length-1) {
+
+            // check length between the vertices in the previous strip
+            auto v1 = surface_mesh.vertices.at(i - s.length + 1);
+            auto v2 = surface_mesh.vertices.at(i - s.length);
+            float distance = glm::distance(v1, v2);
+
+            if (distance < distance_threshold) {
+                Mesh::Object::FaceType f1;
+                f1.emplace_back(Mesh::Vertex(i - s.length + 1, i - s.length + 1));
+                f1.emplace_back(Mesh::Vertex(i - s.length, i - s.length));
+                f1.emplace_back(Mesh::Vertex(i, i));
+                //TODO correct faulty face
+                surface_mesh_object.faces.push_back(f1);
+                normal = glm::cross(
+                    surface_mesh.vertices.at(i),
+                    surface_mesh.vertices.at(i - s.length));
+            }
+        }
+
+        //After first vertex strip AND after first point in vertex strip
+        if (i >= s.length && i % s.length >= 1) {
+
+            // check length to previous vertex in strip
+            auto v1 = surface_mesh.vertices.at(i);
+            auto v2 = surface_mesh.vertices.at(i - 1);
+            float distance = glm::distance(v1, v2);
+
+            if (distance<distance_threshold){
+                Mesh::Object::FaceType f2;
+                f2.emplace_back(Mesh::Vertex(i, i));
+                f2.emplace_back(Mesh::Vertex(i - 1, i - 1));
+                f2.emplace_back(Mesh::Vertex(i - s.length, i - s.length));
+                surface_mesh_object.faces.push_back(f2);
+                //normal only linear combination of the two adjacent faces processed in this iteration
+                normal = (normal + glm::cross(
+                    surface_mesh.vertices.at(i),
+                    surface_mesh.vertices.at(i - 1))) / 2.0f;
+            }
+        }
+
+        surface_mesh.normals.push_back(normal);
+    }
+    surface_mesh.objects.push_back(surface_mesh_object);
 }

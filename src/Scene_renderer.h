@@ -66,6 +66,8 @@ private:
         std::vector<std::vector<Curve>>& curves_2D);
     void draw_labels_in_2D(const glm::mat4& projection);
 
+    void draw_surface(Streamsurface& s);
+
     std::vector<float> split_animation(float animation_pos, int sections);
 
     // Drawing parameters

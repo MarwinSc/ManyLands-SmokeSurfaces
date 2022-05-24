@@ -118,6 +118,10 @@ auto Player_speed(0.1f);
 
 auto Curve_max_deviation(0.8f);
 
+//surface seeding start and endpoint
+glm::vec3 initial_position = glm::vec3(15.0, 10.0, 0.3),
+second_initial_position = glm::vec3(2.0, 10.0, 0.3);
+
 //******************************************************************************
 // Color_to_ImVec4
 //******************************************************************************
@@ -330,16 +334,13 @@ void mainloop()
                     yw_rot = 0.f,
                     zw_rot = 0.f,
                     fov_4d[3] = { 30.f * static_cast<float>(DEG_TO_RAD),
-                                  30.f * static_cast<float>(DEG_TO_RAD),
-                                  30.f * static_cast<float>(DEG_TO_RAD) },
+                                    30.f * static_cast<float>(DEG_TO_RAD),
+                                    30.f * static_cast<float>(DEG_TO_RAD) },
                     fog_dist = 10.f,
                     fog_range = 2.f,
                     parameter_a = 28.0f,
                     parameter_b = 10.0f,
-                    parameter_c = 0.375f,
-                    parameter_x = 28.0f,
-                    parameter_y = 10.0f,
-                    parameter_z = 0.375f;
+                    parameter_c = 0.375f;
 
         ImGui::SetNextWindowSize(ImVec2(static_cast<float>(Left_panel_size),
                                         static_cast<float>(height)));
@@ -641,15 +642,42 @@ void mainloop()
             ImGui::SliderFloat("sigma", &parameter_b, -10.0f, 10.f);
             ImGui::SliderFloat("beta", &parameter_c, -10.0f, 10.f);
 
-            ImGui::SliderFloat("x", &parameter_x, -10.0f, 10.f);
-            ImGui::SliderFloat("y", &parameter_y, -10.0f, 10.f);
-            ImGui::SliderFloat("z", &parameter_z, -10.0f, 10.f);
+            ImGui::SliderFloat3("initial position", (float*)&initial_position, -10.0f, 10.0f);
+            ImGui::SliderFloat3("second position", (float*)&second_initial_position, -10.0f, 10.0f);
 
             if (ImGui::Button("Create_Curve")) {
-                Scene_objs.create_ode(parameter_a,parameter_b,parameter_c, parameter_x, parameter_y, parameter_z, Curve_max_deviation);
+                Scene_objs.create_ode(parameter_a,parameter_b,parameter_c, initial_position[0], initial_position[1], initial_position[2], Curve_max_deviation);
             }
             if (ImGui::Button("Clear")) {
                 State->curves.clear();
+                State->surfaces.clear();
+            }
+            if (ImGui::Button("Create_Surface")) {
+
+                auto vars = std::make_shared<std::vector<float>>();
+                vars->push_back(parameter_a);
+                vars->push_back(parameter_b);
+                vars->push_back(parameter_c);
+
+                auto initial = std::make_shared<std::vector<std::vector<double>>>();
+                initial->push_back(std::vector<double>{0.0, initial_position[0], initial_position[1], initial_position[2], 1.0});
+
+                //points between point 1 and 2
+                glm::vec3 from_to = second_initial_position - initial_position;
+                for (float i = 1.0f; i <= 100.0f; i+=5) {
+                    std::vector<double> point = std::vector<double>{ 0.0 };
+                    glm::vec3 temp = initial_position + (i / 100.0f) * from_to;
+                    point.push_back(temp[0]);
+                    point.push_back(temp[1]);
+                    point.push_back(temp[2]);
+                    point.push_back(1.0);
+
+                    initial->push_back(point);
+                }
+
+                initial->push_back(std::vector<double>{0.0, second_initial_position[0], second_initial_position[1], second_initial_position[2], 1.0});
+
+                Scene_objs.create_surface(*vars, *initial);
             }
         }
 
