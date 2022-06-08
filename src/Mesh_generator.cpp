@@ -95,14 +95,14 @@ void Mesh_generator::cylinder(
         auto norm_shift = first_norm + 2 * i;
 
         Mesh::Object::FaceType f1;
-        f1.emplace_back(Mesh::Vertex(vert_shift, norm_shift));
-        f1.emplace_back(Mesh::Vertex(vert_shift + 2, norm_shift + 2));
-        f1.emplace_back(Mesh::Vertex(vert_shift + 1, norm_shift + 1));
+        f1.emplace_back(Mesh::Vertex(vert_shift, norm_shift, 0));
+        f1.emplace_back(Mesh::Vertex(vert_shift + 2, norm_shift + 2, 0));
+        f1.emplace_back(Mesh::Vertex(vert_shift + 1, norm_shift + 1, 0));
 
         Mesh::Object::FaceType f2;
-        f2.emplace_back(Mesh::Vertex(vert_shift + 1, norm_shift + 1));
-        f2.emplace_back(Mesh::Vertex(vert_shift + 2, norm_shift + 2));
-        f2.emplace_back(Mesh::Vertex(vert_shift + 3, norm_shift + 3));
+        f2.emplace_back(Mesh::Vertex(vert_shift + 1, norm_shift + 1, 0));
+        f2.emplace_back(Mesh::Vertex(vert_shift + 2, norm_shift + 2, 0));
+        f2.emplace_back(Mesh::Vertex(vert_shift + 3, norm_shift + 3, 0));
 
         object.faces.push_back(f1);
         object.faces.push_back(f2);
@@ -198,14 +198,14 @@ void Mesh_generator::cylinder_v2(
         auto norm_shift = first_norm + 2 * i;
 
         Mesh::Object::FaceType f1;
-        f1.emplace_back(Mesh::Vertex(vert_shift, norm_shift));
-        f1.emplace_back(Mesh::Vertex(vert_shift + 2, norm_shift + 2));
-        f1.emplace_back(Mesh::Vertex(vert_shift + 1, norm_shift + 1));
+        f1.emplace_back(Mesh::Vertex(vert_shift, norm_shift, 0));
+        f1.emplace_back(Mesh::Vertex(vert_shift + 2, norm_shift + 2, 0));
+        f1.emplace_back(Mesh::Vertex(vert_shift + 1, norm_shift + 1, 0));
 
         Mesh::Object::FaceType f2;
-        f2.emplace_back(Mesh::Vertex(vert_shift + 1, norm_shift + 1));
-        f2.emplace_back(Mesh::Vertex(vert_shift + 2, norm_shift + 2));
-        f2.emplace_back(Mesh::Vertex(vert_shift + 3, norm_shift + 3));
+        f2.emplace_back(Mesh::Vertex(vert_shift + 1, norm_shift + 1, 0));
+        f2.emplace_back(Mesh::Vertex(vert_shift + 2, norm_shift + 2, 0));
+        f2.emplace_back(Mesh::Vertex(vert_shift + 3, norm_shift + 3, 0));
 
         object.faces.push_back(f1);
         object.faces.push_back(f2);
@@ -304,19 +304,19 @@ void Mesh_generator::sphere(
         for (unsigned int j = 0; j < rings; ++j)
         {
             Mesh::Object::FaceType& f1 = object.faces[2 * (i * rings + j)];
-            f1.emplace_back(Mesh::Vertex(vert_index(i, j), norm_index(i, j)));
+            f1.emplace_back(Mesh::Vertex(vert_index(i, j), norm_index(i, j), 0));
             f1.emplace_back(
-                Mesh::Vertex(vert_index(i, j + 1), norm_index(i, j + 1)));
+                Mesh::Vertex(vert_index(i, j + 1), norm_index(i, j + 1), 0));
             f1.emplace_back(
-                Mesh::Vertex(vert_index(i + 1, j), norm_index(i + 1, j)));
+                Mesh::Vertex(vert_index(i + 1, j), norm_index(i + 1, j), 0));
 
             Mesh::Object::FaceType& f2 = object.faces[2 * (i * rings + j) + 1];
             f2.emplace_back(Mesh::Vertex(
-                vert_index(i + 1, j + 1), norm_index(i + 1, j + 1)));
+                vert_index(i + 1, j + 1), norm_index(i + 1, j + 1), 0));
             f2.emplace_back(
-                Mesh::Vertex(vert_index(i + 1, j), norm_index(i + 1, j)));
+                Mesh::Vertex(vert_index(i + 1, j), norm_index(i + 1, j), 0));
             f2.emplace_back(
-                Mesh::Vertex(vert_index(i, j + 1), norm_index(i, j + 1)));
+                Mesh::Vertex(vert_index(i, j + 1), norm_index(i, j + 1), 0));
         }
     }
 
@@ -327,65 +327,112 @@ void Mesh_generator::sphere(
 // surface
 //******************************************************************************
 
-void Mesh_generator::surface(Streamsurface &s, Mesh &surface_mesh) {
+float calculate_triangle_area(glm::vec3 v1, glm::vec3 v2, glm::vec3 v3) {
+    auto c1 = (v2 - v1);
+    auto c2 = (v3 - v1);
+    auto r = glm::cross(c1, c2);
+    return sqrt(r.x * r.x + r.y * r.y + r.z * r.z) / 2.0f;
+}
 
-    surface_mesh.colors.push_back(glm::vec4(1.0, 0.0, 0.0, 0.7));
+float angle_between_vectors(glm::vec3 v1, glm::vec3 v2) {
+    v1 = glm::normalize(v1);
+    v2 = glm::normalize(v2);
+    auto d = glm::dot(v1, v2);
+    return acos(d) * (180.0 / 3.141592653589793238463);
+}
+
+float calculate_opacity(glm::vec3 &v1, glm::vec3 &v2, glm::vec3 &v3, glm::vec3 camera_pos, glm::vec3 normal, float surface_height, float distance) {
+    //alpha_density
+    float area = calculate_triangle_area(v1,v2,v3);
+    float angle = angle_between_vectors(camera_pos, normal);
+    float density = std::clamp(surface_height / (area * angle), 0.0f, 1.0f);
+    //alpha_shape
+    float d0 = glm::length(v3 - v2);
+    float d1 = glm::length(v1 - v3);
+    float d2 = glm::length(v2 - v1);
+    std::vector<float> distances{ d0, d1, d2 };
+    float max_distance = *std::max_element(distances.begin(), distances.end());
+    //own to make large triangles less opaque
+    float exponent = std::clamp(max_distance / distance, 0.1f,1.0f);
+    float shape = pow((4.0f * area) / (sqrt(3) * max_distance),exponent);
+
+    return density * shape;
+}
+
+void Mesh_generator::surface(Streamsurface &s, Mesh &surface_mesh,const Color &c, glm::vec3 &camera_pos, bool use_distance_treshold, float surface_height) {
 
     Mesh::Object surface_mesh_object;
+    //surface_mesh.colors.push_back(glm::vec4(c.r() / 255.0f, c.g() / 255.0f, c.b() / 255.0f, 1.0f));
 
     //set distance threshold for edges
     auto v1 = s.get_vertices().at(0);
-    auto v2 = s.get_vertices().at(1);
-    float distance_threshold = glm::distance(glm::vec3(v1(0), v1(1), v1(2)), glm::vec3(v2(0), v2(1), v2(2))) * 10;
+    auto v2 = s.get_vertices().at(4);
+    float distance_threshold = glm::distance(glm::vec3(v1(0), v1(1), v1(2)), glm::vec3(v2(0), v2(1), v2(2)));
+    int color_index = 0;
+    int normal_index = 0;
     
     for (int i = 0; i < s.get_vertices().size(); i++) {
         auto current = s.get_vertices().at(i);
         surface_mesh.vertices.push_back(glm::vec3(current(0), current(1), current(2)));
-        glm::vec3 normal = glm::vec3(0.0,1.0,0.0);
 
-        //After first vertex strip AND not the last vertex of the strip
-        if (i >= s.length && i % s.length != s.length-1) {
+        //After first vertex strip 
+        if(i >= s.length){
+            // not the last vertex of the strip
+            if (i % s.length != s.length-1) {
 
-            // check length between the vertices in the previous strip
-            auto v1 = surface_mesh.vertices.at(i - s.length + 1);
-            auto v2 = surface_mesh.vertices.at(i - s.length);
-            float distance = glm::distance(v1, v2);
+                // check length between the vertices in the previous strip
+                auto v1 = surface_mesh.vertices.at(i - s.length + 1);
+                auto v2 = surface_mesh.vertices.at(i - s.length);
+                float distance = glm::distance(v1, v2);
 
-            if (distance < distance_threshold) {
-                Mesh::Object::FaceType f1;
-                f1.emplace_back(Mesh::Vertex(i - s.length + 1, i - s.length + 1));
-                f1.emplace_back(Mesh::Vertex(i - s.length, i - s.length));
-                f1.emplace_back(Mesh::Vertex(i, i));
-                //TODO correct faulty face
-                surface_mesh_object.faces.push_back(f1);
-                normal = glm::cross(
+                if (!use_distance_treshold || distance < distance_threshold) {
+                    Mesh::Object::FaceType f1;
+                    f1.emplace_back(Mesh::Vertex(i - s.length + 1, normal_index, color_index));
+                    f1.emplace_back(Mesh::Vertex(i - s.length, normal_index, color_index));
+                    f1.emplace_back(Mesh::Vertex(i, normal_index, color_index));
+                    surface_mesh_object.faces.push_back(f1);
+                }
+                glm::vec3 normal = glm::cross(
+                    surface_mesh.vertices.at(i),
+                    surface_mesh.vertices.at(i - s.length + 1));
+                normal = glm::normalize(normal);
+                surface_mesh.normals.push_back(normal);
+                normal_index++;
+
+                float opacity = calculate_opacity(v1, v2, surface_mesh.vertices.at(i), camera_pos, normal, surface_height, distance_threshold);
+                surface_mesh.colors.push_back(glm::vec4(c.r() / 255.0f, c.g() / 255.0f, c.b() / 255.0f, opacity));
+                color_index++;
+            }
+
+            //after first point in vertex strip
+            if (i % s.length >= 1) {
+
+                // check length to previous vertex in strip
+                auto v1 = surface_mesh.vertices.at(i);
+                auto v2 = surface_mesh.vertices.at(i - 1);
+                float distance = glm::distance(v1, v2);
+
+                if (!use_distance_treshold || distance<distance_threshold){
+                    Mesh::Object::FaceType f2;
+                    f2.emplace_back(Mesh::Vertex(i, normal_index, color_index));
+                    f2.emplace_back(Mesh::Vertex(i - 1, normal_index, color_index));
+                    f2.emplace_back(Mesh::Vertex(i - s.length, normal_index, color_index));
+                    surface_mesh_object.faces.push_back(f2);
+                }
+                
+                glm::vec3 normal = glm::cross(
                     surface_mesh.vertices.at(i),
                     surface_mesh.vertices.at(i - s.length));
+                normal = glm::normalize(normal);
+                surface_mesh.normals.push_back(normal);
+                normal_index++;
+            
+                float opacity = calculate_opacity(v1, v2, surface_mesh.vertices.at(i - s.length), camera_pos, normal, surface_height, distance_threshold);
+                surface_mesh.colors.push_back(glm::vec4(c.r() / 255.0f, c.g() / 255.0f, c.b() / 255.0f, opacity));
+                color_index++;
             }
         }
-
-        //After first vertex strip AND after first point in vertex strip
-        if (i >= s.length && i % s.length >= 1) {
-
-            // check length to previous vertex in strip
-            auto v1 = surface_mesh.vertices.at(i);
-            auto v2 = surface_mesh.vertices.at(i - 1);
-            float distance = glm::distance(v1, v2);
-
-            if (distance<distance_threshold){
-                Mesh::Object::FaceType f2;
-                f2.emplace_back(Mesh::Vertex(i, i));
-                f2.emplace_back(Mesh::Vertex(i - 1, i - 1));
-                f2.emplace_back(Mesh::Vertex(i - s.length, i - s.length));
-                surface_mesh_object.faces.push_back(f2);
-                //normal only linear combination of the two adjacent faces processed in this iteration
-                normal = (normal + glm::cross(
-                    surface_mesh.vertices.at(i),
-                    surface_mesh.vertices.at(i - 1))) / 2.0f;
-            }
-        }
-
-        surface_mesh.normals.push_back(normal);
     }
     surface_mesh.objects.push_back(surface_mesh_object);
 }
+

@@ -8,7 +8,7 @@ class Streamsurface : public Scene_wireframe_object
 {
 public:
 
-	Streamsurface::Streamsurface();
+	//Streamsurface::Streamsurface();
 	void add_point_strip(std::vector<Scene_vertex_t> &points, float time);
 	int length;
 

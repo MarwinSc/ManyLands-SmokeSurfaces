@@ -60,7 +60,8 @@ void Diffuse_shader::append_to_geometry(Mesh_geometry& geom, const Mesh& m)
                         Data_array vnc;
                         vnc.vert = glm::vec4(m.vertices[f[0].vertex_id], 1);
                         vnc.norm = m.normals[f[0].normal_id];
-                        vnc.color = c;
+                        //vnc.color = c;
+                        vnc.color = m.colors[f[0].color_id];
                         geom.data_array.push_back(vnc);
                     }
                     // Vertex 2
@@ -68,7 +69,8 @@ void Diffuse_shader::append_to_geometry(Mesh_geometry& geom, const Mesh& m)
                         Data_array vnc;
                         vnc.vert = glm::vec4(m.vertices[f[i + 1].vertex_id], 1);
                         vnc.norm = m.normals[f[i + 1].normal_id];
-                        vnc.color = c;
+                        //vnc.color = c;
+                        vnc.color = m.colors[f[i + 1].color_id];
                         geom.data_array.push_back(vnc);
                     }
                     // Vertex 3
@@ -76,7 +78,8 @@ void Diffuse_shader::append_to_geometry(Mesh_geometry& geom, const Mesh& m)
                         Data_array vnc;
                         vnc.vert = glm::vec4(m.vertices[f[i + 2].vertex_id], 1);
                         vnc.norm = m.normals[f[i + 2].normal_id];
-                        vnc.color = c;
+                        //vnc.color = c;
+                        vnc.color = m.colors[f[i + 2].color_id];
                         geom.data_array.push_back(vnc);
                     }
                 }
@@ -91,7 +94,8 @@ void Diffuse_shader::append_to_geometry(Mesh_geometry& geom, const Mesh& m)
                         Data_array vnc;
                         vnc.vert = glm::vec4(m.vertices[f[i + 2].vertex_id], 1);
                         vnc.norm = m.normals[f[i + 2].normal_id];
-                        vnc.color = c;
+                        //vnc.color = c;
+                        vnc.color = m.colors[f[i + 2].color_id];
                         geom.data_array.push_back(vnc);
                     }
                 }
@@ -140,8 +144,6 @@ void Diffuse_shader::draw_geometry(
                           GL_FALSE,
                           stride,
                           ptr2);
-    //TODO remove again:
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     glDrawElements(GL_TRIANGLES,
                    static_cast<GLsizei>(geom->indices.size()),

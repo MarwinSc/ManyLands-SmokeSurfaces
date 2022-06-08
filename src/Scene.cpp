@@ -340,8 +340,7 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
 
     }
     //create Streamsurface object
-    //TODO remove -20
-    int minimum = 1000;
+    int minimum = INT_MAX;
     for (int i = 0; i < trajectories->size(); i++) {
         if (trajectories->at(i).size() < minimum) {
             minimum = trajectories->at(i).size();

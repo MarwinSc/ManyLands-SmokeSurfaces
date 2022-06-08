@@ -65,11 +65,13 @@ public:
          show_legend,
          use_simple_dali_cross,
          scale_tesseract,
-         use_unique_curve_colors;
+         use_unique_curve_colors,
+         use_distance_treshold;
 
     float stat_kernel_size,
           stat_max_movement,
-          stat_max_value;
+          stat_max_value,
+          surface_height;
 
     std::array<float, 4> tesseract_size;
 

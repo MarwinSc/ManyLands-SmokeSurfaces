@@ -32,6 +32,8 @@ Scene_state::Scene_state()
     , stat_kernel_size(0.01f)
     , stat_max_movement(0.01f)
     , stat_max_value(0.01f)
+    , use_distance_treshold(false)
+    , surface_height(1.0f)
 {
     curve_colors_.emplace_back(Color(228,  26,  28));
     curve_colors_.emplace_back(Color( 55, 126, 184));

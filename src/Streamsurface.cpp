@@ -1,9 +1,7 @@
 
 #include "Streamsurface.h"
 
-Streamsurface::Streamsurface() {
-
-}
+//Streamsurface::Streamsurface() {}
 
 void Streamsurface::add_point_strip(std::vector<Scene_vertex_t> &points, float time) {
 

@@ -119,9 +119,14 @@ auto Player_speed(0.1f);
 auto Curve_max_deviation(0.8f);
 
 //surface seeding start and endpoint
-glm::vec3 initial_position = glm::vec3(15.0, 10.0, 0.3),
-second_initial_position = glm::vec3(2.0, 10.0, 0.3);
-
+glm::vec3 initial_position = glm::vec3(15.0, 1.0, 1.0),
+second_initial_position = glm::vec3(1.0, 1.0, 1.0),
+system_parameter = glm::vec3(28.0, 10.0, 0.375);
+//nr of trajectories
+int nr_of_trajectories = 5;
+//draw curve from first and last point
+bool draw_curves = false;
+bool wireframe_on = false;
 //******************************************************************************
 // Color_to_ImVec4
 //******************************************************************************
@@ -324,23 +329,20 @@ void mainloop()
     // ImGui windows start
     {
         static float tesseract_thickness = 3.f,
-                    curve_thickness = 3.f,
-                    sphere_diameter = 3.f,
-                    camera_3D_dist = 3.f,
-                    xy_rot = 0.f,
-                    yz_rot = 0.f,
-                    zx_rot = 0.f,
-                    xw_rot = 0.f,
-                    yw_rot = 0.f,
-                    zw_rot = 0.f,
-                    fov_4d[3] = { 30.f * static_cast<float>(DEG_TO_RAD),
-                                    30.f * static_cast<float>(DEG_TO_RAD),
-                                    30.f * static_cast<float>(DEG_TO_RAD) },
-                    fog_dist = 10.f,
-                    fog_range = 2.f,
-                    parameter_a = 28.0f,
-                    parameter_b = 10.0f,
-                    parameter_c = 0.375f;
+            curve_thickness = 3.f,
+            sphere_diameter = 3.f,
+            camera_3D_dist = 3.f,
+            xy_rot = 0.f,
+            yz_rot = 0.f,
+            zx_rot = 0.f,
+            xw_rot = 0.f,
+            yw_rot = 0.f,
+            zw_rot = 0.f,
+            fov_4d[3] = { 30.f * static_cast<float>(DEG_TO_RAD),
+                            30.f * static_cast<float>(DEG_TO_RAD),
+                            30.f * static_cast<float>(DEG_TO_RAD) },
+            fog_dist = 10.f,
+            fog_range = 2.f;
 
         ImGui::SetNextWindowSize(ImVec2(static_cast<float>(Left_panel_size),
                                         static_cast<float>(height)));
@@ -638,35 +640,33 @@ void mainloop()
         if (ImGui::CollapsingHeader("Debug"))
         {
             ImGui::Text("Lorenz: ");
-            ImGui::SliderFloat("rho", &parameter_a, -30.0f, 30.f);
-            ImGui::SliderFloat("sigma", &parameter_b, -10.0f, 10.f);
-            ImGui::SliderFloat("beta", &parameter_c, -10.0f, 10.f);
 
-            ImGui::SliderFloat3("initial position", (float*)&initial_position, -10.0f, 10.0f);
-            ImGui::SliderFloat3("second position", (float*)&second_initial_position, -10.0f, 10.0f);
+            ImGui::SliderFloat3("Sys Parameters", (float*)&system_parameter, -30.0f, 30.0f);
+            ImGui::SliderFloat3("From Initial", (float*)&initial_position, -10.0f, 10.0f);
+            ImGui::SliderFloat3("To   Initial", (float*)&second_initial_position, -10.0f, 10.0f);
 
             if (ImGui::Button("Create_Curve")) {
-                Scene_objs.create_ode(parameter_a,parameter_b,parameter_c, initial_position[0], initial_position[1], initial_position[2], Curve_max_deviation);
+                Scene_objs.create_ode(system_parameter[0], system_parameter[1], system_parameter[2], initial_position[0], initial_position[1], initial_position[2], Curve_max_deviation);
             }
-            if (ImGui::Button("Clear")) {
-                State->curves.clear();
-                State->surfaces.clear();
-            }
+
+            ImGui::SliderInt("Nr of Trajectories", &nr_of_trajectories, 2, 40);
+            ImGui::Checkbox("Draw Boundary Curves", &draw_curves); 
+
             if (ImGui::Button("Create_Surface")) {
 
                 auto vars = std::make_shared<std::vector<float>>();
-                vars->push_back(parameter_a);
-                vars->push_back(parameter_b);
-                vars->push_back(parameter_c);
+                vars->push_back(system_parameter[0]);
+                vars->push_back(system_parameter[1]);
+                vars->push_back(system_parameter[2]);
 
                 auto initial = std::make_shared<std::vector<std::vector<double>>>();
-                initial->push_back(std::vector<double>{0.0, initial_position[0], initial_position[1], initial_position[2], 1.0});
+                initial->push_back(std::vector<double>{initial_position[0], initial_position[1], initial_position[2], 1.0});
 
                 //points between point 1 and 2
                 glm::vec3 from_to = second_initial_position - initial_position;
-                for (float i = 1.0f; i <= 100.0f; i+=5) {
-                    std::vector<double> point = std::vector<double>{ 0.0 };
-                    glm::vec3 temp = initial_position + (i / 100.0f) * from_to;
+                for (float i = 1.0f; i < nr_of_trajectories - 1; i++) {
+                    std::vector<double> point = std::vector<double>{};
+                    glm::vec3 temp = initial_position + (i / float(nr_of_trajectories - 1)) * from_to;
                     point.push_back(temp[0]);
                     point.push_back(temp[1]);
                     point.push_back(temp[2]);
@@ -675,9 +675,31 @@ void mainloop()
                     initial->push_back(point);
                 }
 
-                initial->push_back(std::vector<double>{0.0, second_initial_position[0], second_initial_position[1], second_initial_position[2], 1.0});
+                initial->push_back(std::vector<double>{second_initial_position[0], second_initial_position[1], second_initial_position[2], 1.0});
 
                 Scene_objs.create_surface(*vars, *initial);
+
+                if (draw_curves) {
+                    Scene_objs.create_ode(system_parameter[0], system_parameter[1], system_parameter[2], initial_position[0], initial_position[1], initial_position[2], Curve_max_deviation);
+                    Scene_objs.create_ode(system_parameter[0], system_parameter[1], system_parameter[2], second_initial_position[0], second_initial_position[1], second_initial_position[2], Curve_max_deviation);
+                }
+            }
+
+            ImGui::InputFloat("Surface Height", &State->surface_height);
+            ImGui::Checkbox("Distance Treshold", &State->use_distance_treshold);
+
+            if (ImGui::Checkbox("Wireframe", &wireframe_on)) {
+                if (wireframe_on) {
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                }
+                else {
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                }
+            }
+
+            if (ImGui::Button("Clear")) {
+                State->curves.clear();
+                State->surfaces.clear();
             }
         }
 

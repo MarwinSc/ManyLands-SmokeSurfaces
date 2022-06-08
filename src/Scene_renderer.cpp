@@ -162,22 +162,29 @@ void Scene_renderer::render()
         project_to_3D(projected_c[ci].get_vertices(), rot_m);
     }
 
+    //same for surfaces
+    std::vector<Streamsurface> projected_surfaces;
+    typedef std::vector<Streamsurface> surfaces_3d_t;
+    std::vector<surfaces_3d_t> surfaces_3d;
+
+    for (size_t si = 0; si < state_->surfaces.size(); ++si)
+    {
+        projected_surfaces.push_back(*state_->surfaces.at(si).get());
+
+        surfaces_3d_t surfaces;
+        for (int i = 0; i < 8; ++i)
+            surfaces.push_back(*state_->surfaces[si].get());
+        surfaces_3d.push_back(surfaces);
+
+        project_to_3D(projected_surfaces[si].get_vertices(), rot_m);
+    }
+
     // Animation unfolding the tesseract to the Dali-cross
     if(state_->unfolding_anim == 0)
     {
         // Draw tesseract
         if(state_->show_tesseract)
             draw_tesseract(projected_t);
-
-        //-----------------------------------------------------------
-        if (!state_->surfaces.empty()) {
-            std::vector<Streamsurface> projected_streamsurface;
-            projected_streamsurface.push_back(*state_->surfaces.at(0).get());
-
-            project_to_3D(projected_streamsurface[0].get_vertices(), rot_m);
-            draw_surface(projected_streamsurface[0]);
-        }
-        //-----------------------------------------------------------
 
         // Draw 4D curve
         if(state_->show_curve)
@@ -202,6 +209,14 @@ void Scene_renderer::render()
                 draw_annotations(projected_c[ci], mvp_mat);
             }
         }
+        //Surface drawing
+        if (!state_->surfaces.empty()) {
+
+            for (size_t si = 0; si < projected_surfaces.size(); ++si)
+            {
+                draw_surface(projected_surfaces[si], state_->get_curve_color(si), 1.);
+            }
+        }
     }
     else
     {
@@ -209,9 +224,13 @@ void Scene_renderer::render()
 
         for(auto& c: curves_3d)
             move_curves_to_3D_plots(project_curve_4D, c);
+        for (auto& s : surfaces_3d) {
+            move_surfaces_to_3D_plots(project_curve_4D, s);
+        }
 
         if(unfold_4D > 0)
             tesseract_unfolding(unfold_4D, plots_3D, curves_3d);
+            tesseract_unfolding(unfold_4D, plots_3D, surfaces_3d);
 
         // Project 3D plots from 4D to 3D
         auto rot = get_rotation_matrix(unfold_4D);
@@ -289,6 +308,26 @@ void Scene_renderer::render()
                     }
                 }
             }
+
+            //Surfaces
+            if (!state_->surfaces.empty()) {
+                for (size_t si = 0; si < surfaces_3d.size(); ++si)
+                {
+                    for (size_t i = 0; i < surfaces_3d[si].size(); ++i) {
+
+                        if (state_->use_simple_dali_cross && i != 1 &&
+                            i != 2 && i != 5 && i != 7)
+                        {
+                            continue;
+                        }
+
+                        auto s = surfaces_3d[si][i];
+                        project_to_3D(s.get_vertices(), rot);
+
+                        draw_surface(s, state_->get_curve_color(si), visibility_coeff(i) * (1.f - hide_3D));
+                    }
+                }
+            }
         }
 
         // Create meshes for the cubes representign the Tesseract / Dali-cross
@@ -323,6 +362,32 @@ void Scene_renderer::render()
             }
             plots_unfolding(unfold_3D, plots_2D, curves_2d);
 
+            //same for surfaces
+            typedef std::vector<Streamsurface> surfaces_2d_t;
+            std::vector<surfaces_2d_t> surfaces_2d;
+
+            for (auto& s3d : surfaces_3d) {
+                std::vector<Streamsurface> surfaces;
+                surfaces.push_back(s3d[5]);
+                surfaces.push_back(s3d[1]);
+                surfaces.push_back(s3d[7]);
+                surfaces.push_back(s3d[1]);
+                surfaces.push_back(s3d[7]);
+                surfaces.push_back(s3d[7]);
+
+                move_surfaces_to_2D_plots(project_curve_3D, surfaces);
+                surfaces_2d.push_back(surfaces);
+            }
+            for (auto& s2d : surfaces_2d)
+            {
+                for (auto& s : s2d)
+                {
+                    project_to_3D(s.get_vertices(), rot);
+                }
+            }
+            plots_unfolding(unfold_3D, plots_2D, surfaces_2d);
+
+
             // Draw 2D plots
             if(state_->show_tesseract)
             {
@@ -355,6 +420,15 @@ void Scene_renderer::render()
                         }
 
                         draw_annotations(c, mvp_mat);
+                    }
+                }
+            }
+            //Surfaces
+            if (!state_->surfaces.empty()) {
+                for (size_t si = 0; si < surfaces_2d.size(); ++si)
+                {
+                    for (auto& s : surfaces_2d[si]) {
+                        draw_surface(s, state_->get_curve_color(si), 1.);
                     }
                 }
             }
@@ -499,13 +573,7 @@ void Scene_renderer::project_to_3D(
 
     //if(tmp_vert(3) < 0)
         //gui_.distanceWarning->show();
-    //assert(tmp_vert(3) > 0);
-    if (tmp_vert(3) < 0) {
-        //std::cout << "tmp_vert(3) < 0" << std::endl;
-        tmp_vert(3) = 10.0;
-    }
-    //TODO
-
+    assert(tmp_vert(3) > 0);
 
     tmp_vert(0) /= tmp_vert(4);
     tmp_vert(1) /= tmp_vert(4);
@@ -1446,12 +1514,289 @@ void Scene_renderer::draw_labels_in_2D(const glm::mat4& projection)
 // draw_surface
 //******************************************************************************
 
-void Scene_renderer::draw_surface(Streamsurface &s) {
+void Scene_renderer::draw_surface(Streamsurface &s, const Color &c, float opacity) {
 
     Mesh surface_mesh;
-    Mesh_generator::surface(s, surface_mesh);
 
-    diffuse_shader_->append_to_geometry(*front_geometry_.get(), surface_mesh);
-    //diffuse_shader_->append_to_geometry(*back_geometry_.get(), surface_mesh);
+    Mesh_generator::surface(s, surface_mesh, c, state_->camera_3D, state_->use_distance_treshold, state_->surface_height);
 
+    if (opacity < 255.0f) {
+        diffuse_shader_->append_to_geometry(*front_geometry_.get(), surface_mesh);
+    }
+    else {
+        diffuse_shader_->append_to_geometry(*back_geometry_.get(), surface_mesh);
+    }
+}
+
+//******************************************************************************
+// move surface to 3D plots
+//******************************************************************************
+
+void Scene_renderer::move_surfaces_to_3D_plots(float coeff, std::vector<Streamsurface>& surfaces) {
+
+    // Surface 1
+    for (auto& v : surfaces[0].get_vertices())
+        v(3) = v(3) + coeff * (state_->tesseract_size[3] / 2 - v(3));
+    // Surface 2
+    for (auto& v : surfaces[1].get_vertices())
+        v(3) = v(3) + coeff * (-state_->tesseract_size[3] / 2 - v(3));
+    // Surface 3
+    for (auto& v : surfaces[2].get_vertices())
+        v(2) = v(2) + coeff * (state_->tesseract_size[2] / 2 - v(2));
+    // Surface 4
+    for (auto& v : surfaces[3].get_vertices())
+        v(2) = v(2) + coeff * (-state_->tesseract_size[2] / 2 - v(2));
+    // Surface 5
+    for (auto& v : surfaces[4].get_vertices())
+        v(1) = v(1) + coeff * (-state_->tesseract_size[1] / 2 - v(1));
+    // Surface 6
+    for (auto& v : surfaces[5].get_vertices())
+        v(1) = v(1) + coeff * (state_->tesseract_size[1] / 2 - v(1));
+    // Surface 7
+    for (auto& v : surfaces[6].get_vertices())
+        v(0) = v(0) + coeff * (-state_->tesseract_size[0] / 2 - v(0));
+    // Surface 8
+    for (auto& v : surfaces[7].get_vertices())
+        v(0) = v(0) + coeff * (state_->tesseract_size[0] / 2 - v(0));
+
+}
+
+//******************************************************************************
+// move surface to 2D plots
+//******************************************************************************
+
+void Scene_renderer::move_surfaces_to_2D_plots(
+    float coeff,
+    std::vector<Streamsurface>& surfaces)
+{
+    // Curve 1
+    for (auto& v : surfaces[0].get_vertices())
+        v(2) = v(2) + coeff * (-state_->tesseract_size[2] / 2 - v(2));
+    // Curve 2
+    for (auto& v : surfaces[1].get_vertices())
+        v(2) = v(2) + coeff * (-state_->tesseract_size[2] / 2 - v(2));
+    // Curve 3
+    for (auto& v : surfaces[2].get_vertices())
+        v(2) = v(2) + coeff * (-state_->tesseract_size[2] / 2 - v(2));
+    // Curve 4
+    for (auto& v : surfaces[3].get_vertices())
+        v(1) = v(1) + coeff * (-state_->tesseract_size[1] / 2 - v(1));
+    // Curve 5
+    for (auto& v : surfaces[4].get_vertices())
+        v(1) = v(1) + coeff * (-state_->tesseract_size[1] / 2 - v(1));
+    // Curve 6
+    for (auto& v : surfaces[5].get_vertices())
+        v(0) = v(0) + coeff *
+        (0.5f * state_->tesseract_size[0] + state_->tesseract_size[3] - v(0));
+}
+
+//******************************************************************************
+// tesseract_unfolding for surfaces
+//******************************************************************************
+
+void Scene_renderer::tesseract_unfolding(
+    float coeff,
+    std::vector<Cube>& plots_3D,
+    std::vector<std::vector<Streamsurface>>& surfaces_3D)
+{
+    auto transform_3D_plot =
+        [](Scene_wireframe_object& c,
+            boost::numeric::ublas::matrix<float>& rot,
+            Scene_vertex_t disp)
+    {
+        for (auto& v : c.get_vertices())
+        {
+            for (int i = 0; i < 5; ++i)
+                v(i) += disp(i);
+
+            v = prod(v, rot);
+
+            for (int i = 0; i < 5; ++i)
+                v(i) -= disp(i);
+        }
+    };
+
+    // Cube and curve 1 and 5
+    {
+        auto rot = Matrix_lib_f::getYWRotationMatrix(
+            static_cast<float>(-coeff * PI / 2));
+        Scene_vertex_t disp1(5);
+        disp1 <<= 0,
+            state_->tesseract_size[1] / 2,
+            0,
+            state_->tesseract_size[3] / 2,
+            0;
+
+        //transform_3D_plot(plots_3D[0], rot, disp1);
+        //transform_3D_plot(plots_3D[4], rot, disp1);
+
+        const auto vert = plots_3D[4].get_vertices()[0];
+        Scene_vertex_t disp2(5);
+        disp2 <<= 0, -vert(1), 0, -vert(3), 0;
+
+        //transform_3D_plot(plots_3D[0], rot, disp2);
+
+        for (auto& c : surfaces_3D)
+        {
+            transform_3D_plot(c[4], rot, disp1);
+
+            transform_3D_plot(c[0], rot, disp1);
+            transform_3D_plot(c[0], rot, disp2);
+        }
+    }
+    // Cube and curve 3
+    {
+        auto rot = Matrix_lib_f::getZWRotationMatrix(
+            static_cast<float>(coeff * PI / 2));
+        Scene_vertex_t disp(5);
+        disp <<= 0,
+            0,
+            -state_->tesseract_size[2] / 2,
+            state_->tesseract_size[3] / 2,
+            0;
+
+        //transform_3D_plot(plots_3D[2], rot, disp);
+
+        for (auto& c : surfaces_3D)
+            transform_3D_plot(c[2], rot, disp);
+    }
+    // Cube and curve 4
+    {
+        auto rot = Matrix_lib_f::getZWRotationMatrix(
+            static_cast<float>(-coeff * PI / 2));
+        Scene_vertex_t disp(5);
+        disp <<= 0,
+            0,
+            state_->tesseract_size[2] / 2,
+            state_->tesseract_size[3] / 2,
+            0;
+
+        //transform_3D_plot(plots_3D[3], rot, disp);
+
+        for (auto& c : surfaces_3D)
+            transform_3D_plot(c[3], rot, disp);
+    }
+    // Cube and curve 6
+    {
+        auto rot = Matrix_lib_f::getYWRotationMatrix(
+            static_cast<float>(coeff * PI / 2));
+        Scene_vertex_t disp(5);
+        disp <<= 0,
+            -state_->tesseract_size[1] / 2,
+            0,
+            state_->tesseract_size[3] / 2,
+            0;
+
+        //transform_3D_plot(plots_3D[5], rot, disp);
+
+        for (auto& c : surfaces_3D)
+            transform_3D_plot(c[5], rot, disp);
+    }
+    // Cube and curve 7
+    {
+        auto rot = Matrix_lib_f::getXWRotationMatrix(
+            static_cast<float>(coeff * PI / 2));
+        Scene_vertex_t disp(5);
+        disp <<= state_->tesseract_size[0] / 2,
+            0,
+            0,
+            state_->tesseract_size[3] / 2,
+            0;
+
+        //transform_3D_plot(plots_3D[6], rot, disp);
+
+        for (auto& c : surfaces_3D)
+            transform_3D_plot(c[6], rot, disp);
+    }
+    // Cube and curve 8
+    {
+        auto rot = Matrix_lib_f::getXWRotationMatrix(
+            static_cast<float>(-coeff * PI / 2));
+        Scene_vertex_t disp(5);
+        disp <<= -state_->tesseract_size[0] / 2,
+            0,
+            0,
+            state_->tesseract_size[3] / 2,
+            0;
+
+        //transform_3D_plot(plots_3D[7], rot, disp);
+
+        for (auto& c : surfaces_3D)
+            transform_3D_plot(c[7], rot, disp);
+    }
+}
+
+//******************************************************************************
+// plots_unfolding for surfaces
+//******************************************************************************
+
+void Scene_renderer::plots_unfolding(
+    float coeff,
+    std::vector<Square>& plots_2D,
+    std::vector<std::vector<Streamsurface>>& surfaces_2d)
+{
+    auto transform_3D_plot =
+        [](Scene_wireframe_object& c,
+            boost::numeric::ublas::matrix<float>& rot,
+            Scene_vertex_t& disp)
+    {
+        for (auto& v : c.get_vertices())
+        {
+            // We have to create a copy vector of the size of four in order
+            // to multiype to the 4x4 rotation matrix
+            Scene_vertex_t copy_v(4);
+            copy_v <<= v(0), v(1), v(2), v(3);
+
+            for (int i = 0; i < 4; ++i)
+                copy_v(i) += disp(i);
+
+            copy_v = prod(copy_v, rot);
+
+            for (int i = 0; i < 4; ++i)
+                copy_v(i) -= disp(i);
+
+            v <<= copy_v(0), copy_v(1), copy_v(2), copy_v(3), 0;
+        }
+    };
+
+    {
+        auto anchor = plots_2D[1].get_vertices()[0];
+        auto rot_axis =
+            plots_2D[1].get_vertices()[1] - plots_2D[1].get_vertices()[0];
+        auto rot = Matrix_lib_f::getRotationMatrix(
+            static_cast<float>(coeff * PI / 2),
+            rot_axis(0),
+            rot_axis(1),
+            rot_axis(2));
+        Scene_vertex_t disp(5);
+        disp <<= -anchor(0), -anchor(1), -anchor(2), 0, 0;
+
+        //transform_3D_plot(plots_2D[3], rot, disp);
+        //transform_3D_plot(plots_2D[4], rot, disp);
+        //transform_3D_plot(plots_2D[5], rot, disp);
+
+        for (auto& c : surfaces_2d)
+        {
+            transform_3D_plot(c[3], rot, disp);
+            transform_3D_plot(c[4], rot, disp);
+            transform_3D_plot(c[5], rot, disp);
+        }
+    }
+    {
+        auto anchor = plots_2D[2].get_vertices()[1];
+        auto rot_axis =
+            plots_2D[4].get_vertices()[2] - plots_2D[4].get_vertices()[1];
+        auto rot = Matrix_lib_f::getRotationMatrix(
+            static_cast<float>(coeff * PI / 2),
+            rot_axis(0),
+            rot_axis(1),
+            rot_axis(2));
+        Scene_vertex_t disp(5);
+        disp <<= -anchor(0), -anchor(1), -anchor(2), 0, 0;
+
+        //transform_3D_plot(plots_2D[5], rot, disp);
+
+        for (auto& c : surfaces_2d)
+            transform_3D_plot(c[5], rot, disp);
+    }
 }
