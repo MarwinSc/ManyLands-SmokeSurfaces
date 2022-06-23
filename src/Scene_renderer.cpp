@@ -573,7 +573,10 @@ void Scene_renderer::project_to_3D(
 
     //if(tmp_vert(3) < 0)
         //gui_.distanceWarning->show();
-    assert(tmp_vert(3) > 0);
+   
+    //TODO change back to original line
+    //assert(tmp_vert(3) > 0);
+    assert(tmp_vert(4) != 0);
 
     tmp_vert(0) /= tmp_vert(4);
     tmp_vert(1) /= tmp_vert(4);

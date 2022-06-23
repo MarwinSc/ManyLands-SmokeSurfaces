@@ -125,7 +125,7 @@ void Scene::load_ode(
 // generates trajectories during runtime
 //******************************************************************************
 
-std::shared_ptr<Curve> Scene::create_ode(float a, float b, float c, float x, float y, float z, float cuve_min_rad, float tesseract_size/* = 200.f*/) {
+std::shared_ptr<Curve> Scene::create_ode(float a, float b, float c, float x, float y, float z, float w, float cuve_min_rad, const char* system, float tesseract_size/* = 200.f*/) {
 
     //++
     /*
@@ -153,9 +153,9 @@ std::shared_ptr<Curve> Scene::create_ode(float a, float b, float c, float x, flo
     auto curve = std::make_shared<Curve>();
     auto tg = std::make_unique<Trajectory_generator>();
 
-    std::vector<float> vars{ a,b,c,x,y,z };
+    std::vector<float> vars{ a,b,c,x,y,z,w };
 
-    std::vector<double> coordinates = tg->lorenz(vars);
+    std::vector<double> coordinates = tg->integrate(vars, system);
     Scene_vertex_t p(5);
 
     for (int i = 0; i < coordinates.size() - 5; i += 5) {
@@ -199,7 +199,7 @@ std::shared_ptr<Curve> Scene::create_ode(float a, float b, float c, float x, flo
     curve->translate_vertices(-0.5f * total_size - total_origin);
     curve->scale_vertices(scale);
 
-    curve = std::make_shared<Curve>(curve->get_simpified_curve(cuve_min_rad));
+    //curve = std::make_shared<Curve>(curve->get_simpified_curve(cuve_min_rad));
     curve->update_stats(
         state_->stat_kernel_size,
         state_->stat_max_movement,
@@ -303,7 +303,7 @@ void Scene::create_tesseract()
 // create_surface
 //******************************************************************************
 
-void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<double>> &initial, float tesseract_size/* = 200.f*/)
+void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<double>> &initial, const char* system, float tesseract_size/* = 200.f*/)
 {
     // Reset size of the tesseract
     for (auto& s : state_->tesseract_size)
@@ -330,8 +330,9 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
         temp_vars.push_back(p.at(0));
         temp_vars.push_back(p.at(1));
         temp_vars.push_back(p.at(2));
+        temp_vars.push_back(p.at(3));
 
-        std::vector<double> trajectory = tg->lorenz(temp_vars);
+        std::vector<double> trajectory = tg->integrate(temp_vars, system);
         //mean of trajectory
         //auto const count = static_cast<double>(trajectory.size());
         //auto mean = std::reduce(trajectory.begin(), trajectory.end()) / count;

@@ -14,6 +14,7 @@
 #include <map>
 
 #include "Streamsurface.h"
+#include "Diffuse_shader.h"
 
 enum Scene_color : std::int32_t
 {

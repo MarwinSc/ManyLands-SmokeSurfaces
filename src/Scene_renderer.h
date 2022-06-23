@@ -93,6 +93,7 @@ private:
 
     std::unique_ptr<Diffuse_shader::Mesh_geometry> back_geometry_,
                                                    front_geometry_;
+
     std::unique_ptr<Screen_shader::Screen_geometry> screen_geometry_;
 
     int visibility_mask_;

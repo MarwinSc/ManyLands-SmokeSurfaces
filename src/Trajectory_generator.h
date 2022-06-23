@@ -13,11 +13,7 @@ typedef std::vector< double > state_type;
 
 class Trajectory_generator {
 public:
-	std::vector<double> lorenz(std::vector<float> &vars);
-
-	std::vector<double> integrateSystem(std::vector<float>& vars);
-
-    std::vector<double> create3DTrajectoryWithHomogenCoord(const std::vector<state_type>& coord, const std::vector<double>& times);
+    std::vector<double> integrate(std::vector<float>& vars, const char* system);
 
 private:
 

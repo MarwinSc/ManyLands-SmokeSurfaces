@@ -354,9 +354,9 @@ float calculate_opacity(glm::vec3 &v1, glm::vec3 &v2, glm::vec3 &v3, glm::vec3 c
     float max_distance = *std::max_element(distances.begin(), distances.end());
     //own to make large triangles less opaque
     float exponent = std::clamp(max_distance / distance, 0.1f,1.0f);
-    float shape = pow((4.0f * area) / (sqrt(3) * max_distance),exponent);
+    float shape = pow((4.0f * area) / (sqrt(3) * max_distance), exponent);
 
-    return density * shape;
+    return std::clamp(density * shape, 0.1f, 1.0f);
 }
 
 void Mesh_generator::surface(Streamsurface &s, Mesh &surface_mesh,const Color &c, glm::vec3 &camera_pos, bool use_distance_treshold, float surface_height) {

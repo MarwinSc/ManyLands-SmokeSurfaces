@@ -17,19 +17,49 @@ void lorenz_system(const state_type& x, state_type& dxdt, const double t)
 
 //--------------------------------------------------------------------------------------------
 
-std::vector<double> Trajectory_generator::lorenz(std::vector<float> &vars) {
+//--------------------------------------------------------------------------------------------
 
-	std::vector<double> coordinates = integrateSystem(vars);
-	return coordinates;
-
+void bipolar_disorder_model(const state_type& x, state_type& dxdt, const double t)
+{
+    dxdt[0] = (0.16 / (0.16 + x[1] * x[1])) * ((2 * x[3]) / (1 + 2 * x[3])) - x[0] / (1 + 2 * x[0]);
+    dxdt[1] = (0.16 / (0.16 + x[0] * x[0])) * ((2 * x[2]) / (1 + 2 * x[2])) - x[1] / (1 + 2 * x[1]);
+    dxdt[1] = b * (x[1] - x[3]);
+    dxdt[2] = b * (x[0] - x[2]);
 }
 
-std::vector<double> Trajectory_generator::integrateSystem(std::vector<float>& vars) {
+//--------------------------------------------------------------------------------------------
+
+//--------------------------------------------------------------------------------------------
+
+float k1 = 0.35;
+float k2 = 250;
+float k3 = 0.035;
+float k4 = 20;
+float k5 = 5.35;
+float k6 = 0.0001;
+float k7 = 0.8;
+float k_7 = 0.1;
+float k8 = 0.825;
+
+void peroxidase(const state_type& x, state_type& dxdt, const double t)
+{
+    dxdt[0] = -k3 * x[0] * x[1] * x[3] + k7 - k_7 * x[0];
+    dxdt[1] = -k3 * x[0] * x[1] * x[3] - k1 * x[1] * x[2] + k8;
+    dxdt[2] = k1 * x[1] * x[2] - 2 * k2 * x[2] * x[2] + 3 * k3 * x[0] * x[1] * x[3] - k4 * x[2] + k6;
+    dxdt[3] = -k3 * x[0] * x[1] * x[3] + 2 * k2 * x[2] * x[2] - k5 * x[3];
+}
+
+//--------------------------------------------------------------------------------------------
+
+enum System {Lorenz = 'l', Bipolar = 'b', PO_Reaction = 'p'};
+
+std::vector<double> Trajectory_generator::integrate(std::vector<float>& vars, const char* system) {
 
     std::vector<state_type> x_vec;
     std::vector<double> times;
-    state_type initial(3);
+    state_type initial(4);
 
+    //TODO rework system parameters
     R = vars.at(0);
     sigma = vars.at(1);
     b = vars.at(2);
@@ -37,25 +67,31 @@ std::vector<double> Trajectory_generator::integrateSystem(std::vector<float>& va
     initial[0] = vars.at(3); // start at x=...
     initial[1] = vars.at(4);
     initial[2] = vars.at(5);
+    initial[3] = vars.at(6);
 
-    size_t steps = boost::numeric::odeint::integrate(lorenz_system, initial, 0.0, 10.0, 0.1, push_back_state_and_time(x_vec, times));
-
-    return create3DTrajectoryWithHomogenCoord(x_vec, times);
-
-}
-
-std::vector<double> Trajectory_generator::create3DTrajectoryWithHomogenCoord(const std::vector<state_type>& coord, const std::vector<double>& times) {
+    if (system == "Lorenz") {
+        size_t steps = boost::numeric::odeint::integrate(lorenz_system, initial, 0.0, 100.0, 0.7, push_back_state_and_time(x_vec, times));
+    }
+    if (system == "PO_Reaction") {
+        size_t steps = boost::numeric::odeint::integrate(peroxidase, initial, 0.0, 100.0, 0.7, push_back_state_and_time(x_vec, times));
+    }
 
     std::vector<double> coordinates;
     for (int i = 0; i < times.size(); i++) {
         coordinates.push_back(i);
-        coordinates.push_back(coord[i][0]);
-        coordinates.push_back(coord[i][1]);
-        coordinates.push_back(coord[i][2]);
-        coordinates.push_back(i);
+        coordinates.push_back(x_vec[i][0]);
+        coordinates.push_back(x_vec[i][1]);
+        coordinates.push_back(x_vec[i][2]);
+        if(system != "Lorenz")
+            coordinates.push_back(x_vec[i][3]);
+        else
+            coordinates.push_back(i);
     }
+
     return coordinates;
 }
+
+
 
 
 

@@ -119,14 +119,17 @@ auto Player_speed(0.1f);
 auto Curve_max_deviation(0.8f);
 
 //surface seeding start and endpoint
-glm::vec3 initial_position = glm::vec3(15.0, 1.0, 1.0),
-second_initial_position = glm::vec3(1.0, 1.0, 1.0),
-system_parameter = glm::vec3(28.0, 10.0, 0.375);
+glm::vec4 initial_position = glm::vec4(0.0, 0.0, 1.8, 0.0),
+second_initial_position = glm::vec4(0.0, 0.0, 2.8, 0.0);
+glm::vec3 system_parameter = glm::vec3(28.0, 10.0, 0.01);
 //nr of trajectories
 int nr_of_trajectories = 5;
 //draw curve from first and last point
 bool draw_curves = false;
 bool wireframe_on = false;
+//system dropdown 
+const char* current_item = NULL;
+const char* items[] = { "Lorenz", "Bipolar", "PO_Reaction" };
 //******************************************************************************
 // Color_to_ImVec4
 //******************************************************************************
@@ -639,63 +642,92 @@ void mainloop()
 
         if (ImGui::CollapsingHeader("Debug"))
         {
-            ImGui::Text("Lorenz: ");
 
-            ImGui::SliderFloat3("Sys Parameters", (float*)&system_parameter, -30.0f, 30.0f);
-            ImGui::SliderFloat3("From Initial", (float*)&initial_position, -10.0f, 10.0f);
-            ImGui::SliderFloat3("To   Initial", (float*)&second_initial_position, -10.0f, 10.0f);
+            if (ImGui::BeginCombo("##combo", current_item))
+            {
+                for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+                {
+                    bool is_selected = (current_item == items[n]); // You can store your selection however you want, outside or inside your objects
+                    if (ImGui::Selectable(items[n], is_selected)) {
+                        current_item = items[n];
+                    }
+                    if (is_selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            
 
-            if (ImGui::Button("Create_Curve")) {
-                Scene_objs.create_ode(system_parameter[0], system_parameter[1], system_parameter[2], initial_position[0], initial_position[1], initial_position[2], Curve_max_deviation);
+            if (current_item == "Lorenz") {
+                ImGui::Text("Lorenz: ");
+
+                ImGui::SliderFloat3("Sys Parameters", (float*)&system_parameter, -30.0f, 30.0f);
             }
 
-            ImGui::SliderInt("Nr of Trajectories", &nr_of_trajectories, 2, 40);
-            ImGui::Checkbox("Draw Boundary Curves", &draw_curves); 
+            if (current_item != NULL) {
 
-            if (ImGui::Button("Create_Surface")) {
+                ImGui::SliderFloat4("From Initial", (float*)&initial_position, -10.0f, 10.0f);
+                ImGui::SliderFloat4("To   Initial", (float*)&second_initial_position, -10.0f, 10.0f);
 
-                auto vars = std::make_shared<std::vector<float>>();
-                vars->push_back(system_parameter[0]);
-                vars->push_back(system_parameter[1]);
-                vars->push_back(system_parameter[2]);
-
-                auto initial = std::make_shared<std::vector<std::vector<double>>>();
-                initial->push_back(std::vector<double>{initial_position[0], initial_position[1], initial_position[2], 1.0});
-
-                //points between point 1 and 2
-                glm::vec3 from_to = second_initial_position - initial_position;
-                for (float i = 1.0f; i < nr_of_trajectories - 1; i++) {
-                    std::vector<double> point = std::vector<double>{};
-                    glm::vec3 temp = initial_position + (i / float(nr_of_trajectories - 1)) * from_to;
-                    point.push_back(temp[0]);
-                    point.push_back(temp[1]);
-                    point.push_back(temp[2]);
-                    point.push_back(1.0);
-
-                    initial->push_back(point);
+                if (ImGui::Button("Create_Curve")) {
+                    Scene_objs.create_ode(system_parameter[0], system_parameter[1], system_parameter[2], initial_position[0], initial_position[1], initial_position[2], initial_position[3],Curve_max_deviation, current_item);
                 }
 
-                initial->push_back(std::vector<double>{second_initial_position[0], second_initial_position[1], second_initial_position[2], 1.0});
+                if (ImGui::CollapsingHeader("Surface")) {
 
-                Scene_objs.create_surface(*vars, *initial);
+                    ImGui::SliderInt("Nr of Trajectories", &nr_of_trajectories, 2, 40);
+                    ImGui::Checkbox("Draw Boundary Curves", &draw_curves);
+                    ImGui::InputFloat("Surface Height", &State->surface_height);
+                    ImGui::Checkbox("Distance Treshold", &State->use_distance_treshold);
 
-                if (draw_curves) {
-                    Scene_objs.create_ode(system_parameter[0], system_parameter[1], system_parameter[2], initial_position[0], initial_position[1], initial_position[2], Curve_max_deviation);
-                    Scene_objs.create_ode(system_parameter[0], system_parameter[1], system_parameter[2], second_initial_position[0], second_initial_position[1], second_initial_position[2], Curve_max_deviation);
+                    if (ImGui::Checkbox("Wireframe", &wireframe_on)) {
+                        if (wireframe_on) {
+                            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                        }
+                        else {
+                            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                        }
+                    }
+
+                    if (ImGui::Button("Create_Surface")) {
+
+                        auto vars = std::make_shared<std::vector<float>>();
+                        vars->push_back(system_parameter[0]);
+                        vars->push_back(system_parameter[1]);
+                        vars->push_back(system_parameter[2]);
+
+                        auto initial = std::make_shared<std::vector<std::vector<double>>>();
+                        initial->push_back(std::vector<double>{initial_position[0], initial_position[1], initial_position[2], second_initial_position[3]});
+
+                        //points between point 1 and 2
+                        glm::vec4 from_to = second_initial_position - initial_position;
+                        for (float i = 1.0f; i < nr_of_trajectories - 1; i++) {
+                            std::vector<double> point = std::vector<double>{};
+                            glm::vec4 temp = initial_position + (i / float(nr_of_trajectories - 1)) * from_to;
+                            point.push_back(temp[0]);
+                            point.push_back(temp[1]);
+                            point.push_back(temp[2]);
+                            point.push_back(temp[3]);
+
+                            initial->push_back(point);
+                        }
+
+                        initial->push_back(std::vector<double>{second_initial_position[0], second_initial_position[1], second_initial_position[2], second_initial_position[3]});
+
+                        Scene_objs.create_surface(*vars, *initial, current_item);
+
+                        if (draw_curves) {
+                            Scene_objs.create_ode(system_parameter[0], system_parameter[1], system_parameter[2], initial_position[0], initial_position[1], initial_position[2], initial_position[3], Curve_max_deviation, current_item);
+                            Scene_objs.create_ode(system_parameter[0], system_parameter[1], system_parameter[2], second_initial_position[0], second_initial_position[1], second_initial_position[2], second_initial_position[3], Curve_max_deviation, current_item);
+                        }
+                    }
                 }
             }
 
-            ImGui::InputFloat("Surface Height", &State->surface_height);
-            ImGui::Checkbox("Distance Treshold", &State->use_distance_treshold);
 
-            if (ImGui::Checkbox("Wireframe", &wireframe_on)) {
-                if (wireframe_on) {
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                }
-                else {
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                }
-            }
+
+            ImGui::SliderFloat("4D Projection", &State->camera_4D[3], 105.f, 2000.f);
 
             if (ImGui::Button("Clear")) {
                 State->curves.clear();
@@ -1008,6 +1040,7 @@ int main(int, char**)
 
     Last_timepoint = std::chrono::system_clock::now();
     // Main loop
+
     while(!done)
     {
         mainloop();
