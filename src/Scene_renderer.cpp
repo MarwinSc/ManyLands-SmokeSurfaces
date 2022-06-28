@@ -70,7 +70,7 @@ void Scene_renderer::render()
     if(state_            == nullptr ||
        state_->tesseract == nullptr ||
        state_->curves.empty()       &&
-       state_->surfaces.empty())
+       state_->surfaces_new.empty())  //TODO remove _new  
     {
         return;
     }
@@ -210,12 +210,19 @@ void Scene_renderer::render()
             }
         }
         //Surface drawing
+        
         if (!state_->surfaces.empty()) {
 
             for (size_t si = 0; si < projected_surfaces.size(); ++si)
             {
                 draw_surface(projected_surfaces[si], state_->get_curve_color(si), 1.);
             }
+        }
+        if (!state_->surfaces_new.empty()) {
+            state_->surfaces_new.at(0)->Draw(mvp_mat, state_->camera_3D);
+            //make sure the default shader program is used again
+            glUseProgram(diffuse_shader_->program_id);
+
         }
     }
     else
@@ -571,21 +578,17 @@ void Scene_renderer::project_to_3D(
     tmp_vert = tmp_vert - state_->camera_4D;
     tmp_vert = prod(tmp_vert, state_->projection_4D);
 
-    //if(tmp_vert(3) < 0)
-        //gui_.distanceWarning->show();
-   
-    //TODO change back to original line
-    //assert(tmp_vert(3) > 0);
-    assert(tmp_vert(4) != 0);
+    assert(tmp_vert(3) > 0);
 
     tmp_vert(0) /= tmp_vert(4);
     tmp_vert(1) /= tmp_vert(4);
     tmp_vert(2) /= tmp_vert(4);
+
     // Important!
     // Original coordinates in tmp_vert(3) and tmp_vert(4) are kept!
     // It is required for the 4D perspective.
 
-    point = tmp_vert;
+    point = tmp_vert;   
 }
 
 //******************************************************************************

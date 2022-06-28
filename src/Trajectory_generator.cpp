@@ -70,7 +70,7 @@ std::vector<double> Trajectory_generator::integrate(std::vector<float>& vars, co
     initial[3] = vars.at(6);
 
     if (system == "Lorenz") {
-        size_t steps = boost::numeric::odeint::integrate(lorenz_system, initial, 0.0, 100.0, 0.7, push_back_state_and_time(x_vec, times));
+        size_t steps = boost::numeric::odeint::integrate(lorenz_system, initial, 0.0, 100.0, 10.0, push_back_state_and_time(x_vec, times));
     }
     if (system == "PO_Reaction") {
         size_t steps = boost::numeric::odeint::integrate(peroxidase, initial, 0.0, 100.0, 0.7, push_back_state_and_time(x_vec, times));

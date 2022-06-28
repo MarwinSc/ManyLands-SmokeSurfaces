@@ -16,6 +16,8 @@
 #include "Streamsurface.h"
 #include "Diffuse_shader.h"
 
+#include "Drawable_Streamsurface.h"
+
 enum Scene_color : std::int32_t
 {
     Background,
@@ -52,6 +54,7 @@ public:
     std::shared_ptr<Curve_selection> curve_selection;
 
     std::vector<std::shared_ptr<Streamsurface>> surfaces;
+    std::vector<std::shared_ptr<Drawable_Streamsurface>> surfaces_new;
 
     std::shared_ptr<Tesseract> tesseract;
 

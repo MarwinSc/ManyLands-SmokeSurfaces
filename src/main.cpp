@@ -119,9 +119,9 @@ auto Player_speed(0.1f);
 auto Curve_max_deviation(0.8f);
 
 //surface seeding start and endpoint
-glm::vec4 initial_position = glm::vec4(0.0, 0.0, 1.8, 0.0),
-second_initial_position = glm::vec4(0.0, 0.0, 2.8, 0.0);
-glm::vec3 system_parameter = glm::vec3(28.0, 10.0, 0.01);
+glm::vec4 initial_position = glm::vec4(3.0, 3.0, 3.0, 1.0),
+second_initial_position = glm::vec4(5.0, 5.0, 5.0, 5.0);
+glm::vec3 system_parameter = glm::vec3(28.0, 10.0, 0.375);
 //nr of trajectories
 int nr_of_trajectories = 5;
 //draw curve from first and last point
@@ -732,6 +732,7 @@ void mainloop()
             if (ImGui::Button("Clear")) {
                 State->curves.clear();
                 State->surfaces.clear();
+                State->surfaces_new.clear();
             }
         }
 

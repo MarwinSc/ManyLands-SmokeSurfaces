@@ -11,6 +11,7 @@
 
 #include "Trajectory_generator.h"
 #include "Streamsurface.h"
+#include "Drawable_Streamsurface.h"
 
 //******************************************************************************
 // Scene
@@ -163,6 +164,13 @@ std::shared_ptr<Curve> Scene::create_ode(float a, float b, float c, float x, flo
         p <<= coordinates.at(i + 1), coordinates.at(i + 2), coordinates.at(i + 3), coordinates.at(i + 4), 1;
         float t = coordinates.at(i);
         curve->add_point(p, t);
+        /*
+        std::cout << "point: ";
+        for (auto p_ : p) {
+            std::cout << p_ << ", ";
+        }
+        std::cout << "\n";
+        */
     }
 
     Scene_vertex_t origin, size;
@@ -197,6 +205,8 @@ std::shared_ptr<Curve> Scene::create_ode(float a, float b, float c, float x, flo
     scale[4] = 1;
     
     curve->translate_vertices(-0.5f * total_size - total_origin);
+    Scene_vertex_t translate = -0.5f * total_size - total_origin;
+    
     curve->scale_vertices(scale);
 
     //curve = std::make_shared<Curve>(curve->get_simpified_curve(cuve_min_rad));
@@ -313,6 +323,12 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
     auto trajectories = std::make_unique<std::vector<std::vector<double>>>();
     auto surface = std::make_shared<Streamsurface>();
 
+    Shader shader("assets/surface.vert", "assets/surface.frag", "assets/surface.geom");
+    //Shader shader("assets/surface.vert", "assets/surface.frag");
+    auto surface_new = std::make_shared<Drawable_Streamsurface>(shader);
+    surface_new->set_color(state_->get_curve_color(0));
+
+
     // The aggregative origin and size for all curves
     Scene_vertex_t total_origin(5), total_size(5);
     for (char i = 0; i < 5; ++i)
@@ -357,6 +373,7 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
         }
         float t = trajectories->at(0).at(i);
         surface->add_point_strip(points, t);
+        surface_new->add_point_strip(points, t);
     }
 
     //origin and size
@@ -395,7 +412,15 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
     surface->translate_vertices(-0.5f * total_size - total_origin);
     surface->scale_vertices(scale);
 
-    state_->surfaces.push_back(std::move(surface));
+    Scene_vertex_t translate = -0.5f * total_size - total_origin;
+    surface_new->translate_vertices(translate);
+    surface_new->scale_vertices(scale);
+
+    surface_new->setup_mesh();
+
+    state_->surfaces_new.push_back(std::move(surface_new));
+
+    //state_->surfaces.push_back(std::move(surface));
 
     create_tesseract();
 
