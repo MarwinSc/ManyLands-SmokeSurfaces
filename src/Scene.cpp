@@ -205,7 +205,6 @@ std::shared_ptr<Curve> Scene::create_ode(float a, float b, float c, float x, flo
     scale[4] = 1;
     
     curve->translate_vertices(-0.5f * total_size - total_origin);
-    Scene_vertex_t translate = -0.5f * total_size - total_origin;
     
     curve->scale_vertices(scale);
 
@@ -370,6 +369,12 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
             Scene_vertex_t p(5);
             p <<= trajectories->at(ii).at(i + 1), trajectories->at(ii).at(i + 2), trajectories->at(ii).at(i + 3), trajectories->at(ii).at(i + 4), 1;
             points.push_back(p);
+            /*
+            for (auto p_ : p) {
+                std::cout << p_ << ", ";
+            }
+            std::cout << " \n";
+            */
         }
         float t = trajectories->at(0).at(i);
         surface->add_point_strip(points, t);
@@ -416,6 +421,19 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
     surface_new->translate_vertices(translate);
     surface_new->scale_vertices(scale);
 
+    std::cout << "Translate: \n";
+    for (auto p_ : translate) {
+        std::cout << p_ << ", ";
+    }
+    std::cout << " \n";
+
+    std::cout << "Scale: \n";
+    for (auto p_ : scale) {
+        std::cout << p_ << ", ";
+    }
+    std::cout << " \n";
+
+    surface_new->calculate_normals(state_->projection_4D, state_->camera_4D);
     surface_new->setup_mesh();
 
     state_->surfaces_new.push_back(std::move(surface_new));

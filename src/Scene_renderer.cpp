@@ -70,6 +70,7 @@ void Scene_renderer::render()
     if(state_            == nullptr ||
        state_->tesseract == nullptr ||
        state_->curves.empty()       &&
+       state_->surfaces.empty()     &&
        state_->surfaces_new.empty())  //TODO remove _new  
     {
         return;
@@ -219,7 +220,11 @@ void Scene_renderer::render()
             }
         }
         if (!state_->surfaces_new.empty()) {
-            state_->surfaces_new.at(0)->Draw(mvp_mat, state_->camera_3D);
+
+            state_->surfaces_new.at(0)->set_surface_height(state_->surface_height);
+            state_->surfaces_new.at(0)->Draw(mvp_mat, norm_mat, state_->camera_3D);
+            //state_->surfaces_new.at(0)->Draw_Normals(mvp_mat, norm_mat, proj_mat, state_->camera_3D);
+
             //make sure the default shader program is used again
             glUseProgram(diffuse_shader_->program_id);
 

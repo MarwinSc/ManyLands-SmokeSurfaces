@@ -23,8 +23,8 @@ void bipolar_disorder_model(const state_type& x, state_type& dxdt, const double 
 {
     dxdt[0] = (0.16 / (0.16 + x[1] * x[1])) * ((2 * x[3]) / (1 + 2 * x[3])) - x[0] / (1 + 2 * x[0]);
     dxdt[1] = (0.16 / (0.16 + x[0] * x[0])) * ((2 * x[2]) / (1 + 2 * x[2])) - x[1] / (1 + 2 * x[1]);
-    dxdt[1] = b * (x[1] - x[3]);
-    dxdt[2] = b * (x[0] - x[2]);
+    dxdt[2] = b * (x[1] - x[3]);
+    dxdt[3] = b * (x[0] - x[2]);
 }
 
 //--------------------------------------------------------------------------------------------
@@ -51,6 +51,15 @@ void peroxidase(const state_type& x, state_type& dxdt, const double t)
 
 //--------------------------------------------------------------------------------------------
 
+void test(const state_type& x, state_type& dxdt, const double t) {
+    dxdt[0] = 0.0f;
+    dxdt[1] = 0.1f;
+    dxdt[2] = 0.1f;
+    dxdt[3] = 0.1f;
+}
+
+//--------------------------------------------------------------------------------------------
+
 enum System {Lorenz = 'l', Bipolar = 'b', PO_Reaction = 'p'};
 
 std::vector<double> Trajectory_generator::integrate(std::vector<float>& vars, const char* system) {
@@ -70,10 +79,13 @@ std::vector<double> Trajectory_generator::integrate(std::vector<float>& vars, co
     initial[3] = vars.at(6);
 
     if (system == "Lorenz") {
-        size_t steps = boost::numeric::odeint::integrate(lorenz_system, initial, 0.0, 100.0, 10.0, push_back_state_and_time(x_vec, times));
+        size_t steps = boost::numeric::odeint::integrate(lorenz_system, initial, 0.0, 30.0, 1.0, push_back_state_and_time(x_vec, times));
     }
     if (system == "PO_Reaction") {
         size_t steps = boost::numeric::odeint::integrate(peroxidase, initial, 0.0, 100.0, 0.7, push_back_state_and_time(x_vec, times));
+    }
+    if (system == "test") {
+        size_t steps = boost::numeric::odeint::integrate(test, initial, 0.0, 100.0, 0.01, push_back_state_and_time(x_vec, times));
     }
 
     std::vector<double> coordinates;

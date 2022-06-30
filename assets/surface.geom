@@ -4,12 +4,15 @@ layout (triangle_strip, max_vertices = 3) out;
 
 in VS_OUT {
     vec4 Color;
+    vec3 Normal;
+    vec4 Debug;
 } gs_in[];
 
 out vec4 Color;
 out vec3 Normal;
 out vec3 FragPos;
 out vec3 CameraPos;
+out vec4 Debug;
 
 uniform vec3 camera;
 uniform float surface_height;
@@ -41,14 +44,14 @@ float calculate_opacity(vec3 v1, vec3 v2, vec3 v3, vec3 camera, vec3 normal, flo
     float d1 = length(v1-v3);
     float d2 = length(v2-v1);
     float max_distance = max(d0,max(d1,d2));
-    float exponent = 1.0;
+    float exponent = 0.3;
     float shape = pow((4.0 * area) / (sqrt(3) * max_distance), exponent);
-    return clamp(density * shape, 0.1, 1.0);
+    return clamp(density * shape, 0.0, 1.0);
 }
 
 vec3 calculate_normal(vec3 v1, vec3 v2, vec3 v3){
-    vec3 e1 = v2 - v1;
-    vec3 e2 = v3 - v1;
+    vec3 e1 = v1 - v2;
+    vec3 e2 = v3 - v2;
     return cross(e1,e2);
 }
 
@@ -61,35 +64,39 @@ void main(){
     position = gl_in[2].gl_Position;
     vec3 v3 = vec3(position.x, position.y, position.z);
 
-    vec3 normal = calculate_normal(v1, v2, v3);
-    float opacity = calculate_opacity(v1, v2, v3, camera, normal, surface_height);
-    
+    //vec3 normal = normalize(calculate_normal(v1, v2, v3));
 
-    //gl_Position = vec4(v1,1.0);
+    vec3 normal = gs_in[0].Normal;
+    float opacity = calculate_opacity(v1, v2, v3, camera, normal, surface_height);
     gl_Position = gl_in[0].gl_Position;
     vec4 color = gs_in[0].Color;
     Color = vec4(color.x, color.y, color.z, opacity);
     FragPos = v1;
     Normal = normal;
     CameraPos = camera;
+    Debug = gs_in[0].Debug;
     EmitVertex();
 
-    //gl_Position = vec4(v2,1.0);
+    normal = gs_in[1].Normal;
+    opacity = calculate_opacity(v1, v2, v3, camera, normal, surface_height);
     gl_Position = gl_in[1].gl_Position;
     color = gs_in[1].Color;
     Color = vec4(color.x, color.y, color.z, opacity);
     FragPos = v2;
     Normal = normal;
     CameraPos = camera;
+    Debug = gs_in[1].Debug;
     EmitVertex();
 
-    //gl_Position = vec4(v3,1.0);
+    normal = gs_in[2].Normal;
+    opacity = calculate_opacity(v1, v2, v3, camera, normal, surface_height);
     gl_Position = gl_in[2].gl_Position;
     color = gs_in[2].Color;
     Color = vec4(color.x, color.y, color.z, opacity);
     FragPos = v3;
     Normal = normal;
     CameraPos = camera;
+    Debug = gs_in[2].Debug;
     EmitVertex();
 
     EndPrimitive();

@@ -18,37 +18,39 @@
 
 #include <string>
 #include <vector>
-using namespace std;
 
 struct Vertex {
     // position
     glm::vec4 Position;
     // color 
     glm::vec4 Color;
+    //normal
+    glm::vec3 Normal;
 };
 
 struct Texture {
     unsigned int id;
-    string type;
-    string path;
+    std::string type;
+    std::string path;
 };
 
 class Drawable_Streamsurface {
 public:
     // mesh Data
-    vector<Vertex>       vertices;
-    vector<unsigned int> indices;
+    std::vector<Vertex>       vertices;
+    std::vector<unsigned int> indices;
     unsigned int VAO;
     int surface_width;
-    float surface_height = 0.1f;
-    float distance_threshold;
+    float surface_height = 1.0f;
     glm::vec4 c;
     Shader shader;
     Scene_vertex_t translate;
     Scene_vertex_t scale;
+    Shader shader_normal = Shader("assets/surface.vert", "assets/normal.frag", "assets/normal.geom");
 
-    Drawable_Streamsurface(Shader& shader) {
-        this->shader = shader;
+    Drawable_Streamsurface(Shader& shader_): 
+        shader(shader_)
+    {
     }
 
     void set_color(const Color& c) {
@@ -60,10 +62,11 @@ public:
     }
 
     // render the mesh
-    void Draw(glm::mat4& mvp, glm::vec3& camera)
+    void Draw(glm::mat4& mvp, glm::mat3& normalMatrix, glm::vec3& camera)
     {
         shader.use();
         shader.setMat4("mvp", mvp);
+        shader.setMat3("normalMatrix", normalMatrix);
 
         shader.setFloat("translate.x", translate[0]);
         shader.setFloat("translate.y", translate[1]);
@@ -77,49 +80,138 @@ public:
         shader.setFloat("scale.w", scale[3]);
         shader.setFloat("scale.e", scale[4]);
 
-
         shader.setVec3("camera", camera);
         shader.setFloat("surface_height", surface_height);
 
-        //glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, tbo);
-        //glBeginTransformFeedback(GL_TRIANGLES);
+        glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, tbo);
+        glBeginTransformFeedback(GL_TRIANGLES);
 
         // draw mesh
         glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
-        /*
+        
         glEndTransformFeedback();
         glFlush();
 
-        GLfloat feedback[3];
+        GLfloat feedback[12];
         glGetBufferSubData(GL_TRANSFORM_FEEDBACK_BUFFER, 0, sizeof(feedback), feedback);
 
+        std::cout << "Feedback: \n";
         for (auto p : feedback) {
             std::cout << p << ", ";
         }
         std::cout << "\n";
-        */
+        
+        // always good practice to set everything back to defaults once configured.
+        glActiveTexture(GL_TEXTURE0);
+    }
+
+    void Draw_Normals(glm::mat4& mvp, glm::mat3& normalMatrix, glm::mat4& projectionMatrix, glm::vec3& camera) {
+
+        shader_normal.use();
+        
+        shader_normal.setMat4("mvp", mvp);
+        shader_normal.setMat3("normalMatrix", normalMatrix);
+        shader_normal.setMat4("projection", projectionMatrix);
+
+
+        shader_normal.setFloat("translate.x", translate[0]);
+        shader_normal.setFloat("translate.y", translate[1]);
+        shader_normal.setFloat("translate.z", translate[2]);
+        shader_normal.setFloat("translate.w", translate[3]);
+        shader_normal.setFloat("translate.e", translate[4]);
+
+        shader_normal.setFloat("scale.x", scale[0]);
+        shader_normal.setFloat("scale.y", scale[1]);
+        shader_normal.setFloat("scale.z", scale[2]);
+        shader_normal.setFloat("scale.w", scale[3]);
+        shader_normal.setFloat("scale.e", scale[4]);
+
+        // draw mesh
+        glBindVertexArray(VAO);
+        glDrawElements(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
 
         // always good practice to set everything back to defaults once configured.
         glActiveTexture(GL_TEXTURE0);
     }
 
     //-------Mesh generation---------
+    
+    //TODO Update 
+    void calculate_normals(boost::numeric::ublas::matrix<float>& projection_4D, Scene_vertex_t& camera_4D) {
+        std::vector<glm::vec3> projected_v;
 
+        //project vertices to 3D
+        for (Vertex v : vertices) {
+
+            Scene_vertex_t tmp_vert(5);
+            tmp_vert[0] = v.Position.x;
+            tmp_vert[1] = v.Position.y; 
+            tmp_vert[2] = v.Position.z;
+            tmp_vert[3] = v.Position.w;
+            tmp_vert[4] = 1.0f;
+
+            //TODO add rot_mat
+            //Scene_vertex_t tmp_vert = prod(point, rot_mat);
+            tmp_vert = tmp_vert - camera_4D;
+            tmp_vert = prod(tmp_vert, projection_4D);
+
+            //TODO
+            //assert(tmp_vert(3) > 0);
+
+            tmp_vert(0) /= tmp_vert(4);
+            tmp_vert(1) /= tmp_vert(4);
+            tmp_vert(2) /= tmp_vert(4);
+
+            glm::vec3 vertex = glm::vec3(tmp_vert(0), tmp_vert(1), tmp_vert(2));
+
+            projected_v.push_back(vertex);
+        }
+
+        std::vector<std::vector<unsigned int>> adjacency(vertices.size());
+        std::vector<glm::vec3> face_normals(indices.size()/3);
+
+        //calculate face normal and adjacency information
+        for (int i = 0; i < indices.size(); i += 3) {
+            glm::vec3 v1 = projected_v.at(indices.at(i));
+            glm::vec3 v2 = projected_v.at(indices.at(i+1));
+            glm::vec3 v3 = projected_v.at(indices.at(i+2));
+
+            //save adjacency info for vertex normals
+            adjacency.at(indices.at(i)).push_back(i / 3);
+            adjacency.at(indices.at(i+1)).push_back(i / 3);
+            adjacency.at(indices.at(i+2)).push_back(i / 3);
+
+            glm::vec3 e1 = v1 - v2;
+            glm::vec3 e2 = v3 - v2;
+            glm::vec3 normal = glm::normalize(glm::cross(e2,e1));
+            face_normals.at(i / 3) = normal;
+        }
+
+        //calculate vertex normals
+        int index = 0;
+        for (std::vector<unsigned int> adjacent : adjacency) {
+            glm::vec3 sum = glm::vec3(0.0, 0.0, 0.0);
+
+            for (unsigned int index : adjacent) {
+                sum += face_normals.at(index);
+            }
+            sum /= adjacent.size();
+
+            vertices.at(index++).Normal = sum;
+        }
+    }
+    
     //Add one point strip to the mesh 
-    //TODO hardcoded color
     void add_point_strip(std::vector<Scene_vertex_t>& points, float time) {
 
         //first vertex strip 
         if (vertices.empty()) {
 
             surface_width = points.size();
-
-            auto v1 = points.at(0);
-            auto v2 = points.at(points.size()-1);
-            distance_threshold = glm::distance(glm::vec3(v1(0), v1(1), v1(2)), glm::vec3(v2(0), v2(1), v2(2)));
 
             for (int i = 0; i < points.size(); i++) {
                 auto current = points.at(i);
@@ -134,8 +226,6 @@ public:
         //later vertex strips
         else {
 
-            int index = vertices.size() - 1;
-
             for (int i = 0; i < points.size(); i++) {
 
                 auto current = points.at(i);
@@ -145,6 +235,8 @@ public:
                 vertex.Color = c;
 
                 vertices.push_back(vertex);
+
+                int index = vertices.size() - 1;
 
                 //faces
                 //first vertex of the strip
@@ -162,12 +254,12 @@ public:
                 //middle vertex
                 else {
                     indices.push_back(index);
-                    indices.push_back(index - surface_width + 1);
-                    indices.push_back(index - surface_width);
-
-                    indices.push_back(index);
                     indices.push_back(index - surface_width);
                     indices.push_back(index - 1);
+
+                    indices.push_back(index);
+                    indices.push_back(index - surface_width + 1);
+                    indices.push_back(index - surface_width);
                 }
             }
         }
@@ -206,17 +298,22 @@ public:
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Color));
 
-        
+        // vertex normal
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Normal));
+
+        // for Transfer Feedback Debugging
         glGenBuffers(1, &tbo);
         glBindBuffer(GL_ARRAY_BUFFER, tbo);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * indices.size(), nullptr, GL_STATIC_READ);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec4) * indices.size(), nullptr, GL_STATIC_READ);
     }
 
 private:
     
     unsigned int VBO, EBO;
     GLuint tbo;
-    glm::mat4 model_matrix = glm::mat4(1.f);
+
 
 };
+
 #endif

@@ -1,15 +1,16 @@
 #version 330 core
 layout (location = 0) in vec4 aPos;
 layout (location = 1) in vec4 aColor;
+layout (location = 2) in vec3 aNormal;
 
 out VS_OUT {
     vec4 Color;
+    vec3 Normal;
+    vec4 Debug;
 } vs_out;
 
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
 uniform mat4 mvp;
+uniform mat3 normalMatrix;
 
 struct vec5{
     float x;
@@ -40,6 +41,7 @@ vec5 multiplyVec5(vec5 v1, vec5 v2);
 void main()
 {
     vs_out.Color = aColor;
+    vs_out.Normal = normalMatrix * aNormal;
     
     vec5 vert = vec5(aPos.x, aPos.y, aPos.z, aPos.w, 1.0);
 
@@ -48,19 +50,23 @@ void main()
 
     vert = vec5(vert.x, vert.y, vert.z, vert.w - 550.0, vert.e);
 
+    vs_out.Debug = vec4(vs_out.Normal, 1.0);
+
+
     float fov = 30.0 * (3.141592653589793238463/ 180);
     mat5 projection_4D = get4DProjectionMatrix(fov, fov, fov, 1.0, 10.0);
     vert = multiplyVectorByMat5(vert, projection_4D);
 
     vec4 Position4D = vec4(vert.x / vert.e, vert.y / vert.e, vert.z / vert.e, vert.w / vert.e);
-    Position4D = mvp * Position4D;
+    //Position4D = mvp * Position4D;
 
-    gl_Position = Position4D;
+    //gl_Position = Position4D;
 
-    vec3 Position3D = vec3(Position4D.x / Position4D.w, Position4D.y / Position4D.w, Position4D.z / Position4D.w);
+    //vec3 Position3D = vec3(Position4D.x / Position4D.w, Position4D.y / Position4D.w, Position4D.z / Position4D.w);
 
-    //gl_Position = mvp * vec4(Position3D, 1.0);
-    //gl_Position = vec4(Position3D,1.0);
+    vec3 Position3D = vec3(Position4D.x, Position4D.y, Position4D.z);
+
+    gl_Position = mvp * vec4(Position3D,1.0);
 }
 
 vec5 addVec5(vec5 v1, vec5 v2){

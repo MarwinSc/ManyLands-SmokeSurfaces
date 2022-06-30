@@ -129,7 +129,7 @@ bool draw_curves = false;
 bool wireframe_on = false;
 //system dropdown 
 const char* current_item = NULL;
-const char* items[] = { "Lorenz", "Bipolar", "PO_Reaction" };
+const char* items[] = { "Lorenz", "Bipolar", "PO_Reaction", "test"};
 //******************************************************************************
 // Color_to_ImVec4
 //******************************************************************************
@@ -654,6 +654,15 @@ void mainloop()
                     if (is_selected) {
                         ImGui::SetItemDefaultFocus();
                     }
+                    if (current_item == "Lorenz") {
+                        initial_position = glm::vec4(3.0, 3.0, 3.0, 1.0);
+                        second_initial_position = glm::vec4(5.0, 5.0, 5.0, 5.0);
+                        system_parameter = glm::vec3(28.0, 10.0, 0.375);
+                    }
+                    if (current_item == "test") {
+                        initial_position = glm::vec4(1.0, 1.0, 1.0, 1.0),
+                        second_initial_position = glm::vec4(5.0, 1.0, 1.0, 1.0);
+                    }
                 }
                 ImGui::EndCombo();
             }
@@ -661,8 +670,10 @@ void mainloop()
 
             if (current_item == "Lorenz") {
                 ImGui::Text("Lorenz: ");
-
                 ImGui::SliderFloat3("Sys Parameters", (float*)&system_parameter, -30.0f, 30.0f);
+            }
+            if (current_item == "test") {
+                ImGui::Text("Test: ");
             }
 
             if (current_item != NULL) {
@@ -678,7 +689,7 @@ void mainloop()
 
                     ImGui::SliderInt("Nr of Trajectories", &nr_of_trajectories, 2, 40);
                     ImGui::Checkbox("Draw Boundary Curves", &draw_curves);
-                    ImGui::InputFloat("Surface Height", &State->surface_height);
+                    ImGui::SliderFloat("Surface Height", &State->surface_height,0.01f,2.0f);
                     ImGui::Checkbox("Distance Treshold", &State->use_distance_treshold);
 
                     if (ImGui::Checkbox("Wireframe", &wireframe_on)) {
