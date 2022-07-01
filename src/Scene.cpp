@@ -433,7 +433,21 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
     }
     std::cout << " \n";
 
-    surface_new->calculate_normals(state_->projection_4D, state_->camera_4D);
+    surface_new->translate_vertices(translate);
+    surface_new->scale_vertices(scale);
+    surface_new->set_projection_camera(state_->projection_4D, state_->camera_4D);
+    
+    boost::numeric::ublas::matrix<float> identity = boost::numeric::ublas::identity_matrix<float>(5);
+    for (unsigned i = 0; i < identity.size1(); ++i)
+    {
+        std::cout << "| ";
+        for (unsigned j = 0; j < identity.size2(); ++j)
+        {
+            std::cout << identity(i, j) << " | ";
+        }
+        std::cout << "|" << std::endl;
+    }
+    surface_new->set_rotation(identity);
     surface_new->setup_mesh();
 
     state_->surfaces_new.push_back(std::move(surface_new));

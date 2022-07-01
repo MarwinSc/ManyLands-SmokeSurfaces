@@ -221,7 +221,12 @@ void Scene_renderer::render()
         }
         if (!state_->surfaces_new.empty()) {
 
+            state_->surfaces_new.at(0)->set_rotation(rot_m);
+            state_->surfaces_new.at(0)->set_projection_camera(state_->projection_4D, state_->camera_4D);
+            state_->surfaces_new.at(0)->project_vertices_to3D_and_apply_transforms();
             state_->surfaces_new.at(0)->set_surface_height(state_->surface_height);
+
+            state_->surfaces_new.at(0)->buffer_vertex_data();
             state_->surfaces_new.at(0)->Draw(mvp_mat, norm_mat, state_->camera_3D);
             //state_->surfaces_new.at(0)->Draw_Normals(mvp_mat, norm_mat, proj_mat, state_->camera_3D);
 
@@ -1259,6 +1264,7 @@ void Scene_renderer::tesseract_unfolding(
 
 boost::numeric::ublas::matrix<float> Scene_renderer::get_rotation_matrix()
 {
+
     auto m = Matrix_lib_f::getXYRotationMatrix(state_->xy_rot);
     m = prod(m, Matrix_lib_f::getYZRotationMatrix(state_->yz_rot));
     m = prod(m, Matrix_lib_f::getZXRotationMatrix(state_->zx_rot));

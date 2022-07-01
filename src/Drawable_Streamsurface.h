@@ -22,6 +22,8 @@
 struct Vertex {
     // position
     glm::vec4 Position;
+    // 3D position
+    glm::vec4 Position_3D;
     // color 
     glm::vec4 Color;
     //normal
@@ -44,8 +46,6 @@ public:
     float surface_height = 1.0f;
     glm::vec4 c;
     Shader shader;
-    Scene_vertex_t translate;
-    Scene_vertex_t scale;
     Shader shader_normal = Shader("assets/surface.vert", "assets/normal.frag", "assets/normal.geom");
 
     Drawable_Streamsurface(Shader& shader_): 
@@ -82,15 +82,15 @@ public:
 
         shader.setVec3("camera", camera);
         shader.setFloat("surface_height", surface_height);
-
+        /*
         glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, tbo);
         glBeginTransformFeedback(GL_TRIANGLES);
-
+        */
         // draw mesh
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
-
+        /*
         
         glEndTransformFeedback();
         glFlush();
@@ -103,7 +103,7 @@ public:
             std::cout << p << ", ";
         }
         std::cout << "\n";
-        
+        */
         // always good practice to set everything back to defaults once configured.
         glActiveTexture(GL_TEXTURE0);
     }
@@ -139,71 +139,6 @@ public:
     }
 
     //-------Mesh generation---------
-    
-    //TODO Update 
-    void calculate_normals(boost::numeric::ublas::matrix<float>& projection_4D, Scene_vertex_t& camera_4D) {
-        std::vector<glm::vec3> projected_v;
-
-        //project vertices to 3D
-        for (Vertex v : vertices) {
-
-            Scene_vertex_t tmp_vert(5);
-            tmp_vert[0] = v.Position.x;
-            tmp_vert[1] = v.Position.y; 
-            tmp_vert[2] = v.Position.z;
-            tmp_vert[3] = v.Position.w;
-            tmp_vert[4] = 1.0f;
-
-            //TODO add rot_mat
-            //Scene_vertex_t tmp_vert = prod(point, rot_mat);
-            tmp_vert = tmp_vert - camera_4D;
-            tmp_vert = prod(tmp_vert, projection_4D);
-
-            //TODO
-            //assert(tmp_vert(3) > 0);
-
-            tmp_vert(0) /= tmp_vert(4);
-            tmp_vert(1) /= tmp_vert(4);
-            tmp_vert(2) /= tmp_vert(4);
-
-            glm::vec3 vertex = glm::vec3(tmp_vert(0), tmp_vert(1), tmp_vert(2));
-
-            projected_v.push_back(vertex);
-        }
-
-        std::vector<std::vector<unsigned int>> adjacency(vertices.size());
-        std::vector<glm::vec3> face_normals(indices.size()/3);
-
-        //calculate face normal and adjacency information
-        for (int i = 0; i < indices.size(); i += 3) {
-            glm::vec3 v1 = projected_v.at(indices.at(i));
-            glm::vec3 v2 = projected_v.at(indices.at(i+1));
-            glm::vec3 v3 = projected_v.at(indices.at(i+2));
-
-            //save adjacency info for vertex normals
-            adjacency.at(indices.at(i)).push_back(i / 3);
-            adjacency.at(indices.at(i+1)).push_back(i / 3);
-            adjacency.at(indices.at(i+2)).push_back(i / 3);
-
-            glm::vec3 e1 = v1 - v2;
-            glm::vec3 e2 = v3 - v2;
-            glm::vec3 normal = glm::normalize(glm::cross(e2,e1));
-            face_normals.at(i / 3) = normal;
-        }
-
-        //calculate vertex normals
-        int index = 0;
-        for (std::vector<unsigned int> adjacent : adjacency) {
-            glm::vec3 sum = glm::vec3(0.0, 0.0, 0.0);
-
-            for (unsigned int index : adjacent) {
-                sum += face_normals.at(index);
-            }
-            sum /= adjacent.size();
-
-            vertices.at(index++).Normal = sum;
-        }
-    }
     
     //Add one point strip to the mesh 
     void add_point_strip(std::vector<Scene_vertex_t>& points, float time) {
@@ -265,17 +200,120 @@ public:
         }
     }
 
-    void translate_vertices(Scene_vertex_t& translate) {
-        this->translate = translate;
+    //overwrites and projects the current positions of this surface to 3D
+    void project_vertices_to3D_and_apply_transforms() {
+        unsigned int index = 0;
+        for (Vertex v : vertices) {
+
+            Scene_vertex_t tmp_vert(5);
+            tmp_vert[0] = v.Position.x;
+            tmp_vert[1] = v.Position.y;
+            tmp_vert[2] = v.Position.z;
+            tmp_vert[3] = v.Position.w;
+            tmp_vert[4] = 1.0f;
+
+            tmp_vert += translate;
+
+            for (int i = 0; i < tmp_vert.size(); i++)
+            {
+                tmp_vert[i] *= scale[i];
+            }
+
+            tmp_vert = prod(tmp_vert, rot_mat);
+            tmp_vert = tmp_vert - camera_4D;
+            tmp_vert = prod(tmp_vert, projection_4D);
+
+            //TODO
+            //assert(tmp_vert(3) > 0);
+            if (tmp_vert(3) < 0)
+                std::cerr << "tmp_vert(3) < 0 \n";
+
+            tmp_vert(0) /= tmp_vert(4);
+            tmp_vert(1) /= tmp_vert(4);
+            tmp_vert(2) /= tmp_vert(4);
+
+            vertices.at(index++).Position_3D = glm::vec4(tmp_vert(0), tmp_vert(1), tmp_vert(2), 1.0f);
+        }
     }
 
-    void scale_vertices(Scene_vertex_t& scale) {
-        this->scale = scale;
+    void buffer_vertex_data() {
+        glBindVertexArray(VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);
+    }
+
+    //TODO Update 
+    void calculate_normals() {
+        /*
+        std::vector<glm::vec3> projected_v;
+
+        //project vertices to 3D
+        for (Vertex v : vertices) {
+
+            Scene_vertex_t tmp_vert(5);
+            tmp_vert[0] = v.Position.x;
+            tmp_vert[1] = v.Position.y;
+            tmp_vert[2] = v.Position.z;
+            tmp_vert[3] = v.Position.w;
+            tmp_vert[4] = 1.0f;
+
+            //TODO add rot_mat
+            //Scene_vertex_t tmp_vert = prod(point, rot_mat);
+            tmp_vert = tmp_vert - camera_4D;
+            tmp_vert = prod(tmp_vert, projection_4D);
+
+            //TODO
+            //assert(tmp_vert(3) > 0);
+
+            tmp_vert(0) /= tmp_vert(4);
+            tmp_vert(1) /= tmp_vert(4);
+            tmp_vert(2) /= tmp_vert(4);
+
+            glm::vec3 vertex = glm::vec3(tmp_vert(0), tmp_vert(1), tmp_vert(2));
+
+            projected_v.push_back(vertex);
+        }
+        */
+        std::vector<std::vector<unsigned int>> adjacency(vertices.size());
+        std::vector<glm::vec3> face_normals(indices.size() / 3);
+
+        //calculate face normal and adjacency information
+        for (int i = 0; i < indices.size(); i += 3) {
+            glm::vec3 v1(vertices.at(indices.at(i)).Position_3D);
+            glm::vec3 v2(vertices.at(indices.at(i + 1)).Position_3D);
+            glm::vec3 v3(vertices.at(indices.at(i + 2)).Position_3D);
+
+            //save adjacency info for vertex normals
+            adjacency.at(indices.at(i)).push_back(i / 3);
+            adjacency.at(indices.at(i + 1)).push_back(i / 3);
+            adjacency.at(indices.at(i + 2)).push_back(i / 3);
+
+            glm::vec3 e1 = v1 - v2;
+            glm::vec3 e2 = v3 - v2;
+            glm::vec3 normal = glm::normalize(glm::cross(e2, e1));
+            face_normals.at(i / 3) = normal;
+        }
+
+        //calculate vertex normals
+        int index = 0;
+        for (std::vector<unsigned int> adjacent : adjacency) {
+            glm::vec3 sum = glm::vec3(0.0, 0.0, 0.0);
+
+            for (unsigned int index : adjacent) {
+                sum += face_normals.at(index);
+            }
+            sum /= adjacent.size();
+
+            vertices.at(index++).Normal = sum;
+        }
     }
 
     // initializes all the buffer objects/arrays
     void Drawable_Streamsurface::setup_mesh()
     {
+
+        project_vertices_to3D_and_apply_transforms();
+        calculate_normals();
 
         glGenVertexArrays(1, &VAO);
         glGenBuffers(1, &VBO);
@@ -292,7 +330,7 @@ public:
 
         // vertex Positions
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Position_3D));
 
         // vertex color
         glEnableVertexAttribArray(1);
@@ -307,12 +345,34 @@ public:
         glBindBuffer(GL_ARRAY_BUFFER, tbo);
         glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec4) * indices.size(), nullptr, GL_STATIC_READ);
     }
+    
+    void set_projection_camera(boost::numeric::ublas::matrix<float>& projection_4D, Scene_vertex_t& camera_4D) {
+        this->projection_4D = projection_4D;
+        this->camera_4D = camera_4D;
+    }
+
+    void set_rotation(boost::numeric::ublas::matrix<float>& rot_mat) {
+        this->rot_mat = rot_mat;
+    }
+
+    void translate_vertices(Scene_vertex_t& translate) {
+        this->translate = translate;
+    }
+
+    void scale_vertices(Scene_vertex_t& scale) {
+        this->scale = scale;
+    }
 
 private:
     
     unsigned int VBO, EBO;
     GLuint tbo;
 
+    boost::numeric::ublas::matrix<float> projection_4D; 
+    Scene_vertex_t camera_4D; 
+    boost::numeric::ublas::matrix<float> rot_mat;
+    Scene_vertex_t translate;
+    Scene_vertex_t scale;
 
 };
 
