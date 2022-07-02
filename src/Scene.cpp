@@ -10,7 +10,6 @@
 #include <boost/numeric/ublas/assignment.hpp>
 
 #include "Trajectory_generator.h"
-#include "Streamsurface.h"
 #include "Drawable_Streamsurface.h"
 
 //******************************************************************************
@@ -320,12 +319,11 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
 
     auto tg = std::make_unique<Trajectory_generator>();
     auto trajectories = std::make_unique<std::vector<std::vector<double>>>();
-    auto surface = std::make_shared<Streamsurface>();
 
     Shader shader("assets/surface.vert", "assets/surface.frag", "assets/surface.geom");
     //Shader shader("assets/surface.vert", "assets/surface.frag");
-    auto surface_new = std::make_shared<Drawable_Streamsurface>(shader);
-    surface_new->set_color(state_->get_curve_color(0));
+    auto surface = std::make_shared<Drawable_Streamsurface>(shader);
+    surface->set_color(state_->get_curve_color(state_->surfaces.size()));
 
 
     // The aggregative origin and size for all curves
@@ -378,11 +376,10 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
         }
         float t = trajectories->at(0).at(i);
         surface->add_point_strip(points, t);
-        surface_new->add_point_strip(points, t);
     }
 
     //origin and size
-    Scene_vertex_t origin, size;
+    Scene_vertex_t origin(5), size(5);
     surface->get_boundaries(origin, size);
     for (char i = 0; i < 5; ++i)
     {
@@ -414,43 +411,16 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
     scale[3] = state_->tesseract_size[3] / total_size[3];
     scale[4] = 1;
 
-    surface->translate_vertices(-0.5f * total_size - total_origin);
-    surface->scale_vertices(scale);
-
     Scene_vertex_t translate = -0.5f * total_size - total_origin;
-    surface_new->translate_vertices(translate);
-    surface_new->scale_vertices(scale);
 
-    std::cout << "Translate: \n";
-    for (auto p_ : translate) {
-        std::cout << p_ << ", ";
-    }
-    std::cout << " \n";
-
-    std::cout << "Scale: \n";
-    for (auto p_ : scale) {
-        std::cout << p_ << ", ";
-    }
-    std::cout << " \n";
-
-    surface_new->translate_vertices(translate);
-    surface_new->scale_vertices(scale);
-    surface_new->set_projection_camera(state_->projection_4D, state_->camera_4D);
-    
+    surface->translate_vertices(translate);
+    surface->scale_vertices(scale);
+    surface->set_projection_camera(state_->projection_4D, state_->camera_4D);
     boost::numeric::ublas::matrix<float> identity = boost::numeric::ublas::identity_matrix<float>(5);
-    for (unsigned i = 0; i < identity.size1(); ++i)
-    {
-        std::cout << "| ";
-        for (unsigned j = 0; j < identity.size2(); ++j)
-        {
-            std::cout << identity(i, j) << " | ";
-        }
-        std::cout << "|" << std::endl;
-    }
-    surface_new->set_rotation(identity);
-    surface_new->setup_mesh();
+    surface->set_rotation(identity);
+    surface->setup_mesh();
 
-    state_->surfaces_new.push_back(std::move(surface_new));
+    state_->surfaces.push_back(std::move(surface));
 
     //state_->surfaces.push_back(std::move(surface));
 

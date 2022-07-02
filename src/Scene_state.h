@@ -13,7 +13,6 @@
 // std
 #include <map>
 
-#include "Streamsurface.h"
 #include "Diffuse_shader.h"
 
 #include "Drawable_Streamsurface.h"
@@ -53,8 +52,7 @@ public:
     std::vector<std::shared_ptr<Curve>> curves;
     std::shared_ptr<Curve_selection> curve_selection;
 
-    std::vector<std::shared_ptr<Streamsurface>> surfaces;
-    std::vector<std::shared_ptr<Drawable_Streamsurface>> surfaces_new;
+    std::vector<std::shared_ptr<Drawable_Streamsurface>> surfaces;
 
     std::shared_ptr<Tesseract> tesseract;
 

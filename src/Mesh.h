@@ -9,10 +9,9 @@ struct Mesh
 {
     struct Vertex
     {
-        Vertex(size_t vert_id, size_t norm_id, size_t color_id)
+        Vertex(size_t vert_id, size_t norm_id)
             : vertex_id(vert_id)
             , normal_id(norm_id)
-            , color_id(color_id)
         {
         }
         size_t vertex_id;

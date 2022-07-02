@@ -743,7 +743,6 @@ void mainloop()
             if (ImGui::Button("Clear")) {
                 State->curves.clear();
                 State->surfaces.clear();
-                State->surfaces_new.clear();
             }
         }
 

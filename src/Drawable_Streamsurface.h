@@ -53,8 +53,13 @@ public:
     {
     }
 
+    //TODO update color for all vertices on call
     void set_color(const Color& c) {
-        this->c = glm::vec4(c.r() / 255.0f, c.g() / 255.0f, c.b() / 255.0f, c.a() / 255.0f);
+        auto temp_color = glm::vec4(c.r() / 255.0f, c.g() / 255.0f, c.b() / 255.0f, c.a() / 255.0f);
+        if (!(this->c == temp_color)) {
+            this->c = temp_color;
+            flag_update = true;
+        }
     }
 
     void set_surface_height(float surface_height) {
@@ -82,6 +87,9 @@ public:
 
         shader.setVec3("camera", camera);
         shader.setFloat("surface_height", surface_height);
+
+        //glEnable(GL_BLEND);
+        //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         /*
         glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, tbo);
         glBeginTransformFeedback(GL_TRIANGLES);
@@ -200,6 +208,17 @@ public:
         }
     }
 
+    void update_and_buffer_vertex_data() {
+        if(flag_update){
+            project_vertices_to3D_and_apply_transforms();
+
+            glBindVertexArray(VAO);
+            glBindBuffer(GL_ARRAY_BUFFER, VBO);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(Vertex), &vertices[0]);
+        }
+        flag_update = false;
+    }
+
     //overwrites and projects the current positions of this surface to 3D
     void project_vertices_to3D_and_apply_transforms() {
         unsigned int index = 0;
@@ -234,46 +253,11 @@ public:
 
             vertices.at(index++).Position_3D = glm::vec4(tmp_vert(0), tmp_vert(1), tmp_vert(2), 1.0f);
         }
+        calculate_normals();
     }
 
-    void buffer_vertex_data() {
-        glBindVertexArray(VAO);
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);
-    }
-
-    //TODO Update 
     void calculate_normals() {
-        /*
-        std::vector<glm::vec3> projected_v;
 
-        //project vertices to 3D
-        for (Vertex v : vertices) {
-
-            Scene_vertex_t tmp_vert(5);
-            tmp_vert[0] = v.Position.x;
-            tmp_vert[1] = v.Position.y;
-            tmp_vert[2] = v.Position.z;
-            tmp_vert[3] = v.Position.w;
-            tmp_vert[4] = 1.0f;
-
-            //TODO add rot_mat
-            //Scene_vertex_t tmp_vert = prod(point, rot_mat);
-            tmp_vert = tmp_vert - camera_4D;
-            tmp_vert = prod(tmp_vert, projection_4D);
-
-            //TODO
-            //assert(tmp_vert(3) > 0);
-
-            tmp_vert(0) /= tmp_vert(4);
-            tmp_vert(1) /= tmp_vert(4);
-            tmp_vert(2) /= tmp_vert(4);
-
-            glm::vec3 vertex = glm::vec3(tmp_vert(0), tmp_vert(1), tmp_vert(2));
-
-            projected_v.push_back(vertex);
-        }
-        */
         std::vector<std::vector<unsigned int>> adjacency(vertices.size());
         std::vector<glm::vec3> face_normals(indices.size() / 3);
 
@@ -311,9 +295,7 @@ public:
     // initializes all the buffer objects/arrays
     void Drawable_Streamsurface::setup_mesh()
     {
-
         project_vertices_to3D_and_apply_transforms();
-        calculate_normals();
 
         glGenVertexArrays(1, &VAO);
         glGenBuffers(1, &VBO);
@@ -347,20 +329,68 @@ public:
     }
     
     void set_projection_camera(boost::numeric::ublas::matrix<float>& projection_4D, Scene_vertex_t& camera_4D) {
-        this->projection_4D = projection_4D;
-        this->camera_4D = camera_4D;
+        if (!matrix_equal(this->projection_4D, projection_4D)) {
+            this->projection_4D = projection_4D;
+            this->camera_4D = camera_4D;
+            flag_update = true;
+        }
     }
 
     void set_rotation(boost::numeric::ublas::matrix<float>& rot_mat) {
-        this->rot_mat = rot_mat;
+        if (!matrix_equal(this->rot_mat, rot_mat)) {
+            this->rot_mat = rot_mat;
+            flag_update = true;
+        }
     }
 
     void translate_vertices(Scene_vertex_t& translate) {
         this->translate = translate;
     }
+    void translate_vertices3D(glm::vec3 translate) {
+        glm::translate(this->transform3D, translate);
+    }
 
     void scale_vertices(Scene_vertex_t& scale) {
         this->scale = scale;
+    }
+
+    void get_boundaries(Scene_vertex_t& origin, Scene_vertex_t& size)
+    {
+        // Finding minimum and maximum values of the curve
+        glm::vec4 min;
+        glm::vec4 max;
+
+        if (vertices.size() > 0)
+        {
+            const auto& first = vertices.at(0).Position;
+            min = first;
+            max = first;
+        }
+
+        for (const auto& v : vertices)
+        {
+            const auto& position = v.Position;
+            for (unsigned char i = 0; i < 4; ++i)
+            {
+                if (position[i] < min[i])
+                    min[i] = position[i];
+                if (position[i] > max[i])
+                    max[i] = position[i];
+            }
+        }
+
+        origin[0] = min.x;
+        origin[1] = min.y;
+        origin[2] = min.z;
+        origin[3] = min.w;
+        origin[4] = 1;
+
+        auto diff = max - min;
+        size[0] = diff.x;
+        size[1] = diff.y;
+        size[2] = diff.z;
+        size[3] = diff.w;
+        size[4] = 1;
     }
 
 private:
@@ -373,6 +403,28 @@ private:
     boost::numeric::ublas::matrix<float> rot_mat;
     Scene_vertex_t translate;
     Scene_vertex_t scale;
+    glm::mat4 transform3D = glm::mat4(1.0f);
+    bool flag_update = false;
+
+    //TODO make faster?
+    bool matrix_equal(const boost::numeric::ublas::matrix<float>& m, const boost::numeric::ublas::matrix<float>& n)
+    {
+        bool returnValue =
+            (m.size1() == n.size1()) &&
+            (m.size2() == n.size2());
+
+        if (returnValue)
+        {
+            for (unsigned int i = 0; returnValue && i < m.size1(); ++i)
+            {
+                for (unsigned int j = 0; returnValue && j < m.size2(); ++j)
+                {
+                    returnValue &= m(i, j) == n(i, j);
+                }
+            }
+        }
+        return returnValue;
+    }
 
 };
 
