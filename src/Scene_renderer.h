@@ -50,10 +50,16 @@ private:
     void draw_legend(const Region& region);
     void move_curves_to_3D_plots(float coeff, std::vector<Curve>& curves);
     void move_curves_to_2D_plots(float coeff, std::vector<Curve>& curves);
+    void move_surfaces_to_3D_plots(float coeff, std::vector<Drawable_Streamsurface>& surfaces);
+    void move_surfaces_to_2D_plots(float coeff, std::vector<Drawable_Streamsurface>& surfaces);
     void tesseract_unfolding(
         float coeff,
         std::vector<Cube>& plots_3D,
         std::vector<std::vector<Curve>>& curves_3D);
+    void tesseract_unfolding(
+        float coeff,
+        std::vector<Cube>& plots_3D,
+        std::vector<std::vector<Drawable_Streamsurface>>& surfaces_3D);
 
     boost::numeric::ublas::matrix<float> get_rotation_matrix();
     boost::numeric::ublas::matrix<float>
@@ -64,8 +70,14 @@ private:
         float coeff,
         std::vector<Square>& plots_2D,
         std::vector<std::vector<Curve>>& curves_2D);
+    void plots_unfolding(
+        float coeff,
+        std::vector<Square>& plots_2D,
+        std::vector<std::vector<Drawable_Streamsurface>>& surfaces_2d);
+    
 
     void draw_labels_in_2D(const glm::mat4& projection);
+
 
 
     std::vector<float> split_animation(float animation_pos, int sections);

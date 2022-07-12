@@ -688,9 +688,14 @@ void mainloop()
                 if (ImGui::CollapsingHeader("Surface")) {
 
                     ImGui::SliderInt("Nr of Trajectories", &nr_of_trajectories, 2, 40);
+                    ImGui::SliderFloat("Surface Height", &State->surface_height, 0.01f, 2.0f);
+
+                    ImGui::BeginGroup;
                     ImGui::Checkbox("Draw Boundary Curves", &draw_curves);
-                    ImGui::SliderFloat("Surface Height", &State->surface_height,0.01f,2.0f);
                     ImGui::Checkbox("Distance Treshold", &State->use_distance_treshold);
+                    ImGui::Checkbox("Draw Normals", &State->draw_normals);
+                    ImGui::EndGroup;
+
 
                     if (ImGui::Checkbox("Wireframe", &wireframe_on)) {
                         if (wireframe_on) {

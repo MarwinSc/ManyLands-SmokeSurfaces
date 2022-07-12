@@ -68,12 +68,14 @@ public:
          use_simple_dali_cross,
          scale_tesseract,
          use_unique_curve_colors,
-         use_distance_treshold;
+         use_distance_treshold,
+         draw_normals;
 
     float stat_kernel_size,
           stat_max_movement,
           stat_max_value,
-          surface_height;
+          surface_height,
+          unfoldingstate_lastframe;
 
     std::array<float, 4> tesseract_size;
 

@@ -22,6 +22,7 @@
 struct Vertex {
     // position
     glm::vec4 Position;
+    float hmg_coordinate = 1.0f;
     // 3D position
     glm::vec4 Position_3D;
     // color 
@@ -208,34 +209,50 @@ public:
         }
     }
 
-    void update_and_buffer_vertex_data() {
-        if(flag_update){
-            project_vertices_to3D_and_apply_transforms();
+    //-------Update---------
 
+    void update(bool apply_transforms = true) {
+        if(flag_update){
+            apply_transforms_and_project_vertices_to_3D(apply_transforms);
+        }
+    }
+
+    void buffer_vertex_data() {
+        if (flag_update) {
             glBindVertexArray(VAO);
             glBindBuffer(GL_ARRAY_BUFFER, VBO);
             glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(Vertex), &vertices[0]);
+            flag_update = false;
         }
-        flag_update = false;
+    }
+
+    void update_and_buffer_vertex_data(bool apply_transforms = true) {
+        if(flag_update){
+            update(apply_transforms);
+            buffer_vertex_data();
+        }
     }
 
     //overwrites and projects the current positions of this surface to 3D
-    void project_vertices_to3D_and_apply_transforms() {
+    void apply_transforms_and_project_vertices_to_3D(bool apply_transforms = true) {
         unsigned int index = 0;
-        for (Vertex v : vertices) {
+        for (Vertex &v : vertices) {
 
             Scene_vertex_t tmp_vert(5);
             tmp_vert[0] = v.Position.x;
             tmp_vert[1] = v.Position.y;
             tmp_vert[2] = v.Position.z;
             tmp_vert[3] = v.Position.w;
-            tmp_vert[4] = 1.0f;
+            tmp_vert[4] = v.hmg_coordinate;
 
-            tmp_vert += translate;
+            //don't apply when unfolding
+            if (apply_transforms) {
+                tmp_vert += translate;
 
-            for (int i = 0; i < tmp_vert.size(); i++)
-            {
-                tmp_vert[i] *= scale[i];
+                for (int i = 0; i < tmp_vert.size(); i++)
+                {
+                    tmp_vert[i] *= scale[i];
+                }
             }
 
             tmp_vert = prod(tmp_vert, rot_mat);
@@ -292,10 +309,121 @@ public:
         }
     }
 
+    void tesseract_unfolding(boost::numeric::ublas::matrix<float>& rot, Scene_vertex_t disp) {
+        int index = 0;
+        for (Vertex &v : vertices) {
+            Scene_vertex_t tmp_vert(5);
+            tmp_vert[0] = v.Position.x;
+            tmp_vert[1] = v.Position.y;
+            tmp_vert[2] = v.Position.z;
+            tmp_vert[3] = v.Position.w;
+            tmp_vert[4] = v.hmg_coordinate;
+
+            for (int i = 0; i < 5; ++i)
+                tmp_vert(i) += disp(i);
+
+            tmp_vert = prod(tmp_vert, rot);
+
+            for (int i = 0; i < 5; ++i)
+                tmp_vert(i) -= disp(i);
+
+            vertices.at(index).Position = glm::vec4(tmp_vert(0), tmp_vert(1), tmp_vert(2), tmp_vert(3));
+            vertices.at(index++).hmg_coordinate = tmp_vert(4);
+        }
+        flag_update = true;
+    }
+
+    void move_to_3D_plots(float coeff, float tesseract_size, int index) {
+        for (Vertex& v : vertices) {
+            Scene_vertex_t tmp_vert(5);
+            tmp_vert[0] = v.Position.x;
+            tmp_vert[1] = v.Position.y;
+            tmp_vert[2] = v.Position.z;
+            tmp_vert[3] = v.Position.w;
+            tmp_vert[4] = v.hmg_coordinate;
+
+            //apply translation and scaling here and not in apply_transforms_and_project_vertices_to_3D()
+            tmp_vert += translate;
+
+            for (int i = 0; i < tmp_vert.size(); i++)
+            {
+                tmp_vert[i] *= scale[i];
+            }
+
+            v.Position = glm::vec4(tmp_vert(0), tmp_vert(1), tmp_vert(2), tmp_vert(3));
+            v.hmg_coordinate = tmp_vert(4);
+
+            v.Position[index] = v.Position[index] + coeff * (tesseract_size / 2 - v.Position[index]);
+        }
+        flag_update = true;
+    }
+
+    void plots_unfolding(boost::numeric::ublas::matrix<float>& rot, Scene_vertex_t disp) {
+
+        int index = 0;
+        for (Vertex& v : vertices) {
+            Scene_vertex_t tmp_vert(4);
+            tmp_vert[0] = v.Position_3D.x;
+            tmp_vert[1] = v.Position_3D.y;
+            tmp_vert[2] = v.Position_3D.z;
+            tmp_vert[3] = v.Position_3D.w;
+
+            for (int i = 0; i < 4; ++i)
+                tmp_vert(i) += disp(i);
+
+            tmp_vert = prod(tmp_vert, rot);
+
+            for (int i = 0; i < 4; ++i)
+                tmp_vert(i) -= disp(i);
+
+            vertices.at(index++).Position_3D = glm::vec4(tmp_vert(0), tmp_vert(1), tmp_vert(2), tmp_vert(3));
+        }
+        flag_update = true;
+    }
+
+    void move_to_2D_plot(float coeff, float tesseract_size, int index) {
+        for (Vertex& v : vertices) {
+            v.Position[index] = v.Position[index] + coeff * (tesseract_size / 2 - v.Position[index]);
+        }
+        flag_update = true;
+    }
+
+    void set_projection_camera(boost::numeric::ublas::matrix<float>& projection_4D, Scene_vertex_t& camera_4D) {
+        if (!matrix_equal(this->projection_4D, projection_4D)) {
+            this->projection_4D = projection_4D;
+            this->camera_4D = camera_4D;
+            flag_update = true;
+        }
+    }
+
+    void set_rotation(boost::numeric::ublas::matrix<float>& rot_mat) {
+        if (!matrix_equal(this->rot_mat, rot_mat)) {
+            this->rot_mat = rot_mat;
+            flag_update = true;
+        }
+    }
+
+    void translate_vertices(Scene_vertex_t& translate) {
+        this->translate = translate;
+    }
+    void translate_vertices3D(glm::vec3 translate) {
+        glm::translate(this->transform3D, translate);
+    }
+
+    void scale_vertices(Scene_vertex_t& scale) {
+        this->scale = scale;
+    }
+
+    void set_update_flag() {
+        this->flag_update = true;
+    }
+
+    //-------Initialization---------
+
     // initializes all the buffer objects/arrays
     void Drawable_Streamsurface::setup_mesh()
     {
-        project_vertices_to3D_and_apply_transforms();
+        apply_transforms_and_project_vertices_to_3D();
 
         glGenVertexArrays(1, &VAO);
         glGenBuffers(1, &VBO);
@@ -326,32 +454,6 @@ public:
         glGenBuffers(1, &tbo);
         glBindBuffer(GL_ARRAY_BUFFER, tbo);
         glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec4) * indices.size(), nullptr, GL_STATIC_READ);
-    }
-    
-    void set_projection_camera(boost::numeric::ublas::matrix<float>& projection_4D, Scene_vertex_t& camera_4D) {
-        if (!matrix_equal(this->projection_4D, projection_4D)) {
-            this->projection_4D = projection_4D;
-            this->camera_4D = camera_4D;
-            flag_update = true;
-        }
-    }
-
-    void set_rotation(boost::numeric::ublas::matrix<float>& rot_mat) {
-        if (!matrix_equal(this->rot_mat, rot_mat)) {
-            this->rot_mat = rot_mat;
-            flag_update = true;
-        }
-    }
-
-    void translate_vertices(Scene_vertex_t& translate) {
-        this->translate = translate;
-    }
-    void translate_vertices3D(glm::vec3 translate) {
-        glm::translate(this->transform3D, translate);
-    }
-
-    void scale_vertices(Scene_vertex_t& scale) {
-        this->scale = scale;
     }
 
     void get_boundaries(Scene_vertex_t& origin, Scene_vertex_t& size)
@@ -406,7 +508,6 @@ private:
     glm::mat4 transform3D = glm::mat4(1.0f);
     bool flag_update = false;
 
-    //TODO make faster?
     bool matrix_equal(const boost::numeric::ublas::matrix<float>& m, const boost::numeric::ublas::matrix<float>& n)
     {
         bool returnValue =
