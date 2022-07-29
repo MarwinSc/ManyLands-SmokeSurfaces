@@ -238,10 +238,9 @@ void Scene_renderer::render()
         for (auto& s : surfaces_3d)
             move_surfaces_to_3D_plots(project_curve_4D, s);
 
-
         if(unfold_4D > 0)
-            tesseract_unfolding(unfold_4D, plots_3D, curves_3d);
             tesseract_unfolding(unfold_4D, plots_3D, surfaces_3d);
+            tesseract_unfolding(unfold_4D, plots_3D, curves_3d);
             //TODO tesseract_unfolding for surfaces
             
 
@@ -254,7 +253,7 @@ void Scene_renderer::render()
             if(visibility_mask_ == 0 || visibility_mask_ & 1 << i)
                 return 1.f;
             else
-                return 0.1f;
+                 return 0.1f;
         };
 
         if(0 < hide_4D && project_curve_3D == 0)
@@ -334,6 +333,8 @@ void Scene_renderer::render()
                             continue;
                         }
 
+                        //if (i != 0){// && i != 4 && i != 1){
+
                         auto s = surfaces_3d[si][i];
 
                         s.set_rotation(rot);
@@ -348,6 +349,7 @@ void Scene_renderer::render()
                         }
                         //make sure the default shader program is used again
                         glUseProgram(diffuse_shader_->program_id);
+                        //}
                     }
                 }
             }
@@ -385,7 +387,6 @@ void Scene_renderer::render()
                 }
             }
             plots_unfolding(unfold_3D, plots_2D, curves_2d);
-            
 
             // for surfaces
 
@@ -412,12 +413,12 @@ void Scene_renderer::render()
                     s.set_rotation(rot);
                     s.set_projection_camera(state_->projection_4D, state_->camera_4D);
                     s.set_surface_height(state_->surface_height);
-                    //TODO dont force update 
                     s.update(false);
+
+                    //TODO dont force update 
                 }
             }
             plots_unfolding(unfold_3D, plots_2D, surfaces_2d);
-
 
             // Draw 2D plots
             if(state_->show_tesseract)
@@ -462,6 +463,7 @@ void Scene_renderer::render()
                     for (auto& s : surfaces_2d[si]){
 
                         s.buffer_vertex_data();
+                        s.compute();
                         s.set_color(state_->get_curve_color(si));
                         s.Draw(mvp_mat, norm_mat, state_->camera_3D);
                         if (state_->draw_normals) {
@@ -1556,7 +1558,7 @@ void Scene_renderer::draw_labels_in_2D(const glm::mat4& projection)
 //******************************************************************************
 
 void Scene_renderer::move_surfaces_to_3D_plots(float coeff, std::vector<Drawable_Streamsurface>& surfaces) {
-
+    
     surfaces[0].move_to_3D_plots(coeff, state_->tesseract_size[3], 3);
     surfaces[1].move_to_3D_plots(coeff, -state_->tesseract_size[3], 3);
     surfaces[2].move_to_3D_plots(coeff, state_->tesseract_size[2], 2);
@@ -1589,27 +1591,24 @@ void Scene_renderer::move_surfaces_to_2D_plots(
 
 void Scene_renderer::tesseract_unfolding(
     float coeff,
-    std::vector<Cube>& plots_3D,
+    std::vector<Cube> plots_3D,
     std::vector<std::vector<Drawable_Streamsurface>>& surfaces_3D)
 {
     auto transform_3D_plot =
-        [](Drawable_Streamsurface& s,
+        [](Scene_wireframe_object& c,
             boost::numeric::ublas::matrix<float>& rot,
             Scene_vertex_t disp)
     {
-        /*
-            s.translate_vertices(disp);
+        for (auto& v : c.get_vertices())
+        {
+            for (int i = 0; i < 5; ++i)
+                v(i) += disp(i);
 
-            s.set_rotation(rot);
+            v = prod(v, rot);
 
-            for (int i = 0; i < disp.size(); i++){
-                disp(i) = -disp(i);
-            }
-
-            s.translate_vertices(disp);
-
-        */
-        s.tesseract_unfolding(rot, disp);
+            for (int i = 0; i < 5; ++i)
+                v(i) -= disp(i);
+        }
     };
 
     // Cube and curve 1 and 5
@@ -1623,21 +1622,23 @@ void Scene_renderer::tesseract_unfolding(
             state_->tesseract_size[3] / 2,
             0;
 
-        //transform_3D_plot(plots_3D[0], rot, disp1);
-        //transform_3D_plot(plots_3D[4], rot, disp1);
+        transform_3D_plot(plots_3D[0], rot, disp1);
+        transform_3D_plot(plots_3D[4], rot, disp1);
 
         const auto vert = plots_3D[4].get_vertices()[0];
         Scene_vertex_t disp2(5);
         disp2 <<= 0, -vert(1), 0, -vert(3), 0;
 
         //transform_3D_plot(plots_3D[0], rot, disp2);
-
+        
         for (auto& c : surfaces_3D)
         {
-            transform_3D_plot(c[4], rot, disp1);
-            transform_3D_plot(c[0], rot, disp1);
-            transform_3D_plot(c[0], rot, disp2);
+            c[4].tesseract_unfolding(rot, disp1);
+            c[0].tesseract_unfolding(rot, disp1);
+            c[0].tesseract_unfolding_helper(disp2);
+            //c[0].tesseract_unfolding(rot, disp2);
         }
+        
     }
     // Cube and curve 3
     {
@@ -1650,10 +1651,11 @@ void Scene_renderer::tesseract_unfolding(
             state_->tesseract_size[3] / 2,
             0;
 
-        //transform_3D_plot(plots_3D[2], rot, disp);
+        transform_3D_plot(plots_3D[2], rot, disp);
 
         for (auto& c : surfaces_3D)
-            transform_3D_plot(c[2], rot, disp);
+            c[2].tesseract_unfolding(rot, disp);
+
     }
     // Cube and curve 4
     {
@@ -1666,10 +1668,11 @@ void Scene_renderer::tesseract_unfolding(
             state_->tesseract_size[3] / 2,
             0;
 
-        //transform_3D_plot(plots_3D[3], rot, disp);
+        transform_3D_plot(plots_3D[3], rot, disp);
 
         for (auto& c : surfaces_3D)
-            transform_3D_plot(c[3], rot, disp);
+            c[3].tesseract_unfolding(rot, disp);
+
     }
     // Cube and curve 6
     {
@@ -1682,10 +1685,11 @@ void Scene_renderer::tesseract_unfolding(
             state_->tesseract_size[3] / 2,
             0;
 
-        //transform_3D_plot(plots_3D[5], rot, disp);
+        transform_3D_plot(plots_3D[5], rot, disp);
 
         for (auto& c : surfaces_3D)
-            transform_3D_plot(c[5], rot, disp);
+            c[5].tesseract_unfolding(rot, disp);
+
     }
     // Cube and curve 7
     {
@@ -1698,10 +1702,11 @@ void Scene_renderer::tesseract_unfolding(
             state_->tesseract_size[3] / 2,
             0;
 
-        //transform_3D_plot(plots_3D[6], rot, disp);
+        transform_3D_plot(plots_3D[6], rot, disp);
 
         for (auto& c : surfaces_3D)
-            transform_3D_plot(c[6], rot, disp);
+            c[6].tesseract_unfolding(rot, disp);
+
     }
     // Cube and curve 8
     {
@@ -1714,10 +1719,11 @@ void Scene_renderer::tesseract_unfolding(
             state_->tesseract_size[3] / 2,
             0;
 
-        //transform_3D_plot(plots_3D[7], rot, disp);
+        transform_3D_plot(plots_3D[7], rot, disp);
 
         for (auto& c : surfaces_3D)
-            transform_3D_plot(c[7], rot, disp);
+            c[7].tesseract_unfolding(rot, disp);
+
     }
 }
 
@@ -1730,7 +1736,6 @@ void Scene_renderer::plots_unfolding(
     std::vector<Square>& plots_2D,
     std::vector<std::vector<Drawable_Streamsurface>>& surfaces_2d)
 {
-    
     {
         auto anchor = plots_2D[1].get_vertices()[0];
         auto rot_axis =
@@ -1746,7 +1751,7 @@ void Scene_renderer::plots_unfolding(
         //transform_3D_plot(plots_2D[3], rot, disp);
         //transform_3D_plot(plots_2D[4], rot, disp);
         //transform_3D_plot(plots_2D[5], rot, disp);
-
+        
         for (auto& c : surfaces_2d)
         {
             c[3].plots_unfolding(rot, disp);
@@ -1770,6 +1775,6 @@ void Scene_renderer::plots_unfolding(
         //transform_3D_plot(plots_2D[5], rot, disp);
 
         for (auto& c : surfaces_2d)
-            c[5].plots_unfolding(rot, disp);
+            c[5].plots_unfolding_helper(rot, disp);
     }
 }

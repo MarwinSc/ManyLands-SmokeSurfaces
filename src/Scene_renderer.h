@@ -58,7 +58,7 @@ private:
         std::vector<std::vector<Curve>>& curves_3D);
     void tesseract_unfolding(
         float coeff,
-        std::vector<Cube>& plots_3D,
+        std::vector<Cube> plots_3D,
         std::vector<std::vector<Drawable_Streamsurface>>& surfaces_3D);
 
     boost::numeric::ublas::matrix<float> get_rotation_matrix();

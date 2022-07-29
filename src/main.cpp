@@ -694,6 +694,8 @@ void mainloop()
                     ImGui::Checkbox("Draw Boundary Curves", &draw_curves);
                     ImGui::Checkbox("Distance Treshold", &State->use_distance_treshold);
                     ImGui::Checkbox("Draw Normals", &State->draw_normals);
+                    ImGui::Checkbox("Use CPU", &State->use_cpu);
+
                     ImGui::EndGroup;
 
 

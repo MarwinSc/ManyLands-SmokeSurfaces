@@ -325,6 +325,9 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
     auto surface = std::make_shared<Drawable_Streamsurface>(shader);
     surface->set_color(state_->get_curve_color(state_->surfaces.size()));
 
+    if (state_->use_cpu) {
+        surface->disable_compute_flag();
+    }
 
     // The aggregative origin and size for all curves
     Scene_vertex_t total_origin(5), total_size(5);

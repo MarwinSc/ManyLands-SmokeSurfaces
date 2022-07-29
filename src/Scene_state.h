@@ -63,13 +63,14 @@ public:
     float timeplayer_pos;
 
     bool show_tesseract,
-         show_curve,
-         show_legend,
-         use_simple_dali_cross,
-         scale_tesseract,
-         use_unique_curve_colors,
-         use_distance_treshold,
-         draw_normals;
+        show_curve,
+        show_legend,
+        use_simple_dali_cross,
+        scale_tesseract,
+        use_unique_curve_colors,
+        use_distance_treshold,
+        draw_normals,
+        use_cpu;
 
     float stat_kernel_size,
           stat_max_movement,

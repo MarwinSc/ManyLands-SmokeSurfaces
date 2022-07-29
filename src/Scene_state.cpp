@@ -12,7 +12,7 @@ Scene_state::Scene_state()
     , projection_3D(glm::mat4(1.f))
     , camera_4D(5)
     , projection_4D(5, 5)
-    , tesseract_size{200.f, 200.f, 200.f, 200.f}
+    , tesseract_size{ 200.f, 200.f, 200.f, 200.f }
     , unfolding_anim(0.f)
     , show_tesseract(true)
     , show_curve(true)
@@ -36,6 +36,7 @@ Scene_state::Scene_state()
     , surface_height(1.0f)
     , draw_normals(false)
     , unfoldingstate_lastframe(0.0f)
+    , use_cpu(false)
 {
     curve_colors_.emplace_back(Color(228,  26,  28));
     curve_colors_.emplace_back(Color( 55, 126, 184));

@@ -64,9 +64,8 @@ void main(){
     position = gl_in[2].gl_Position;
     vec3 v3 = vec3(position.x, position.y, position.z);
 
-    //vec3 normal = normalize(calculate_normal(v1, v2, v3));
-
-    vec3 normal = gs_in[0].Normal;
+    vec3 normal = normalize(calculate_normal(v1, v2, v3));
+    //vec3 normal = gs_in[0].Normal;
     float opacity = calculate_opacity(v1, v2, v3, camera, normal, surface_height);
     gl_Position = gl_in[0].gl_Position;
     vec4 color = gs_in[0].Color;
