@@ -60,9 +60,22 @@ void test(const state_type& x, state_type& dxdt, const double t) {
 
 //--------------------------------------------------------------------------------------------
 
+void test_2(const state_type& x, state_type& dxdt, const double t) {
+
+    float k1 = -2;
+    float k2 = 1;
+    float k3 = 0.2f;
+    float k4 = 1;
+
+    dxdt[0] = x[0]*(1-x[1])+k1*x[2];
+    dxdt[1] = k2*(pow(x[0],2)-1)*x[1];
+    dxdt[2] = k3*(1-x[1])*x[3];
+    dxdt[3] = k4*x[2];
+}
+
 enum System {Lorenz = 'l', Bipolar = 'b', PO_Reaction = 'p'};
 
-std::vector<double> Trajectory_generator::integrate(std::vector<float>& vars, const char* system) {
+std::vector<double> Trajectory_generator::integrate(std::vector<float>& vars, const char* system, double integration_end, double step_size) {
 
     std::vector<state_type> x_vec;
     std::vector<double> times;
@@ -79,13 +92,16 @@ std::vector<double> Trajectory_generator::integrate(std::vector<float>& vars, co
     initial[3] = vars.at(6);
 
     if (system == "Lorenz") {
-        size_t steps = boost::numeric::odeint::integrate(lorenz_system, initial, 0.0, 30.0, 1.0, push_back_state_and_time(x_vec, times));
+        size_t steps = boost::numeric::odeint::integrate(lorenz_system, initial, 0.0, integration_end, step_size, push_back_state_and_time(x_vec, times));
     }
     if (system == "PO_Reaction") {
-        size_t steps = boost::numeric::odeint::integrate(peroxidase, initial, 0.0, 100.0, 0.7, push_back_state_and_time(x_vec, times));
+        size_t steps = boost::numeric::odeint::integrate(peroxidase, initial, 0.0, integration_end, step_size, push_back_state_and_time(x_vec, times));
     }
     if (system == "test") {
-        size_t steps = boost::numeric::odeint::integrate(test, initial, 0.0, 100.0, 0.01, push_back_state_and_time(x_vec, times));
+        size_t steps = boost::numeric::odeint::integrate(test, initial, 0.0, integration_end, step_size, push_back_state_and_time(x_vec, times));
+    }
+    if (system == "test_2") {
+        size_t steps = boost::numeric::odeint::integrate(test_2, initial, 0.0, integration_end, step_size, push_back_state_and_time(x_vec, times));
     }
 
     std::vector<double> coordinates;

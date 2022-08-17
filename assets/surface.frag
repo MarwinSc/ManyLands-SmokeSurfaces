@@ -11,19 +11,20 @@ void main()
 //    FragColor = vec4(Color.x, Color.y, Color.z, Color.w);
     //FragColor = vec4(Normal,1.0);
 
+    //ambient
     vec3 LightPos = CameraPos; 
     vec3 lightColor = vec3(1.0,1.0,1.0);
 
-    float ambientStrength = 0.5;
+    float ambientStrength = 0.4;
     vec3 ambient = ambientStrength * lightColor;
   	
     // diffuse 
     vec3 norm = normalize(Normal);
     vec3 lightDir = normalize(LightPos - FragPos);
-    float diff = max(dot(norm, lightDir), 0.0);
+    float diff = max(abs(dot(norm, lightDir)), 0.0);
     vec3 diffuse = diff * lightColor;
             
-    vec3 result = (ambient + diffuse) * vec3(Color.x,Color.y,Color.z);
+    vec3 result = vec3(Color.x,Color.y,Color.z); //* (ambient + diffuse);
     FragColor = vec4(result, Color.w); //
     //FragColor = vec4(1.0,0.0,0.0,1.0);
 }

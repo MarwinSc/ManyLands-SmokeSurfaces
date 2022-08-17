@@ -28,7 +28,7 @@ struct Vertex {
     // color 
     glm::vec4 Color;
     //normal
-    glm::vec3 Normal;
+    //glm::vec3 Normal;
 };
 
 struct Texture {
@@ -42,13 +42,20 @@ public:
     // mesh Data
     std::vector<Vertex>       vertices;
     std::vector<unsigned int> indices; 
+    //positions for computeshader (necessary?)
     std::vector<glm::vec4>    positions;
+    std::vector<int>          adjacency;
+    std::vector<glm::ivec2>   adjacency_offset;
+
+
     int surface_width;
     float surface_height = 1.0f;
     glm::vec4 c;
     Shader shader;
     Shader shader_normal = Shader("assets/surface.vert", "assets/normal.frag", "assets/normal.geom");
     ComputeShader shader_compute = ComputeShader("assets/compute_shader.comp");
+    ComputeShader shader_compute_normals = ComputeShader("assets/vertex_normals.comp");
+    ComputeShader shader_compute_curvature = ComputeShader("assets/curvature.comp");
 
     Drawable_Streamsurface(Shader& shader_): 
         shader(shader_)
@@ -125,7 +132,6 @@ public:
 
         shader_normal.setMat4("mvp", mvp);
         shader_normal.setMat3("normalMatrix", normalMatrix);
-        shader_normal.setMat4("projection", projectionMatrix);
 
         if (flag_use_computeshader) {
             glBindVertexArray(vaos[1]);
@@ -202,6 +208,38 @@ public:
                     indices.push_back(index - surface_width);
                 }
             }
+        }
+    }
+
+    void calculate_adjacency() {
+        //std::vector<std::vector<unsigned int>> adjacency(vertices.size());
+        std::vector<std::vector<unsigned int>> adjacent_triangles(vertices.size());
+
+        //calculate adjacency information
+        for (int i = 0; i < indices.size(); i += 3) {
+
+            //save adjacency info for vertex normals
+            //adjacency.at(indices.at(i)).push_back(i / 3);
+            //adjacency.at(indices.at(i + 1)).push_back(i / 3);
+            //adjacency.at(indices.at(i + 2)).push_back(i / 3);
+
+            adjacent_triangles.at(indices.at(i)).push_back(i/3);
+            adjacent_triangles.at(indices.at(i+1)).push_back(i/3);
+            adjacent_triangles.at(indices.at(i+2)).push_back(i/3);
+
+        }
+
+        //reformate
+        int offset = 0;
+        for (int i = 0; i < adjacent_triangles.size(); i++) {
+            //for (int ii = 0; ii < adjacent_triangles.at(i).size(); ii++) {
+            //    this->adjacency.push_back(adjacent_triangles.at(i).at(ii));
+            //}
+            this->adjacency.insert(this->adjacency.end(), adjacent_triangles.at(i).begin(), adjacent_triangles.at(i).end());
+
+            //vec2 containing offset for the adjacency list and number of neighbours 
+            this->adjacency_offset.push_back(glm::vec2(offset, adjacent_triangles.at(i).size()));
+            offset += adjacent_triangles.at(i).size();
         }
     }
 
@@ -304,7 +342,7 @@ public:
             }
             sum /= adjacent.size();
 
-            vertices.at(index++).Normal = sum;
+            //vertices.at(index++).Normal = sum;
         }
     }
 
@@ -516,7 +554,78 @@ public:
             shader_compute.setBool("flag_plots_unfolding", false);
             shader_compute.setBool("flag_move_to_2D", false);
             shader_compute.setBool("flag_second_rotate_2D", false);
+
+            //glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+            compute_normals();
+            compute_curvature();
         }
+    }
+
+    void compute_normals() {
+
+        shader_compute_normals.use();
+
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo[1]);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo_indices);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ssbo_adjacency);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, ssbo_adjacency_offset);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, ssbo_normals);
+        glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 5, atomic_counter);
+
+        GLuint groups = (vertices.size() / (256 * 1 * 1)) + 1; // +1 because of integer division
+        glDispatchCompute(groups, 1, 1);
+
+        // Read atomic counter
+        glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
+        glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, atomic_counter);
+
+        GLuint* counterValue = (GLuint*)glMapBufferRange(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), GL_MAP_READ_BIT | GL_MAP_WRITE_BIT);
+        int vertex_amount = counterValue[0];
+        //std::cout << "vertex_amount: " << vertex_amount << "\n";
+
+        counterValue[0] = 0; // reset atomic counter
+        glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER); // stop writing to buffer
+        // memory barrier, to make sure everything from the compute shader is written
+        glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
+
+        //debugging read
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+        std::vector<glm::vec4> storage(positions.size());
+        glGetNamedBufferSubData(ssbo_normals, 0, positions.size() * sizeof(glm::vec4), &storage[0]);
+
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    }
+
+    void compute_curvature() {
+         
+        shader_compute_curvature.use();
+
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo[1]);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo_indices);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ssbo_adjacency);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, ssbo_adjacency_offset);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, ssbo_normals);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, ssbo_curvature);
+        glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 6, atomic_counter);
+
+        GLuint groups = (vertices.size() / (256 * 1 * 1)) + 1; // +1 because of integer division
+        glDispatchCompute(groups, 1, 1);
+
+        // Read atomic counter
+        glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
+        glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, atomic_counter);
+
+        GLuint* counterValue = (GLuint*)glMapBufferRange(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), GL_MAP_READ_BIT | GL_MAP_WRITE_BIT);
+        counterValue[0] = 0; // reset atomic counter
+        glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER); // stop writing to buffer
+        // memory barrier, to make sure everything from the compute shader is written
+        glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
+
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+        std::vector<float> storage(positions.size());
+        glGetNamedBufferSubData(ssbo_curvature, 0, positions.size() * sizeof(float), &storage[0]);
+
     }
 
     //--------------------Unfolding---------------------------------------------
@@ -710,6 +819,8 @@ public:
     // initializes all the buffer objects/arrays
     void Drawable_Streamsurface::setup_mesh()
     {
+        calculate_adjacency();
+
         if (flag_use_computeshader){
             glGenVertexArrays(2, vaos);
             glGenBuffers(1, &VBO);
@@ -720,10 +831,33 @@ public:
             //glBufferData(GL_SHADER_STORAGE_BUFFER, vertices.size() * sizeof(glm::vec4), NULL, GL_DYNAMIC_DRAW);
             glBufferData(GL_SHADER_STORAGE_BUFFER, positions.size() * sizeof(glm::vec4), &positions[0], GL_STATIC_DRAW);
 
-
             glGenBuffers(1, &ssbo[1]);
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo[1]);
             glBufferData(GL_SHADER_STORAGE_BUFFER, positions.size() * sizeof(glm::vec4), &positions[0], GL_STATIC_DRAW);
+
+            //indices buffer
+            glGenBuffers(1, &ssbo_indices);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_indices);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
+
+            //adjacency buffer
+            glGenBuffers(1, &ssbo_adjacency);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_adjacency);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, adjacency.size() * sizeof(int), &adjacency[0], GL_STATIC_DRAW);
+
+            glGenBuffers(1, &ssbo_adjacency_offset);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_adjacency_offset);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, positions.size() * sizeof(glm::vec2), &adjacency_offset[0], GL_STATIC_DRAW);
+
+            //curvature buffer 
+            glGenBuffers(1, &ssbo_curvature);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_curvature);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, positions.size() * sizeof(float), NULL, GL_STATIC_DRAW);
+
+            //normal buffer 
+            glGenBuffers(1, &ssbo_normals);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_normals);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, positions.size() * sizeof(glm::vec4), NULL, GL_STATIC_DRAW);
             
             //create atomic counter
             glGenBuffers(1, &atomic_counter);
@@ -757,8 +891,17 @@ public:
             glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Color));
 
             // vertex normal
+            glBindBuffer(GL_ARRAY_BUFFER, ssbo_normals);
             glEnableVertexAttribArray(2);
-            glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Normal));
+            glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 0, NULL);
+
+            // vertex normal
+            glBindBuffer(GL_ARRAY_BUFFER, ssbo_curvature);
+            glEnableVertexAttribArray(3);
+            glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 0, NULL);
+
+            //glEnableVertexAttribArray(2);
+            //glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)offsetof(Vertex, Normal));
         }
         else {
             apply_transforms_and_project_vertices_to_3D();
@@ -785,8 +928,8 @@ public:
             glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Color));
 
             // vertex normal
-            glEnableVertexAttribArray(2);
-            glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Normal));
+            //glEnableVertexAttribArray(2);
+            //glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Normal));
 
             // for Transfer Feedback Debugging
             glGenBuffers(1, &tbo);
@@ -871,6 +1014,11 @@ private:
     //compute shader 
     unsigned int ssbo [2];
     unsigned int ssbo_idx = 0;
+    unsigned int ssbo_indices;
+    unsigned int ssbo_adjacency;
+    unsigned int ssbo_adjacency_offset;
+    unsigned int ssbo_curvature;
+    unsigned int ssbo_normals;
     GLuint vaos[2]; // one VAO for each SSBO
     bool flag_use_computeshader = true;
     unsigned int atomic_counter;

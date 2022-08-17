@@ -107,6 +107,7 @@ void Scene_renderer::render()
     auto world_mat = glm::toMat4(glm::lerp(state_->rotation_3D,
                                            glm::quat(),
                                            static_cast<float>(unfold_3D)));
+
     auto norm_mat = glm::transpose(glm::inverse(glm::mat3(world_mat)));
 
     // Cache the Model-view-projection matrix for arrow drawing
@@ -390,6 +391,7 @@ void Scene_renderer::render()
 
             // for surfaces
 
+            typedef std::vector<Drawable_Streamsurface> surfaces_2d_t;
             typedef std::vector<Drawable_Streamsurface> surfaces_2d_t;
             std::vector<surfaces_2d_t> surfaces_2d;
 

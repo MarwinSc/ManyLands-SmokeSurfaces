@@ -311,7 +311,7 @@ void Scene::create_tesseract()
 // create_surface
 //******************************************************************************
 
-void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<double>> &initial, const char* system, float tesseract_size/* = 200.f*/)
+void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<double>> &initial, const char* system, glm::vec2 &integration_steps_size, float tesseract_size/* = 200.f*/)
 {
     // Reset size of the tesseract
     for (auto& s : state_->tesseract_size)
@@ -348,7 +348,7 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
         temp_vars.push_back(p.at(2));
         temp_vars.push_back(p.at(3));
 
-        std::vector<double> trajectory = tg->integrate(temp_vars, system);
+        std::vector<double> trajectory = tg->integrate(temp_vars, system, integration_steps_size[0], integration_steps_size[1]);
         //mean of trajectory
         //auto const count = static_cast<double>(trajectory.size());
         //auto mean = std::reduce(trajectory.begin(), trajectory.end()) / count;

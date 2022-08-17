@@ -14,7 +14,7 @@ public:
         float cuve_min_rad,
         float tesseract_size = 200.f);
     std::shared_ptr<Curve> create_ode(float a, float b, float c, float x, float y, float z, float w, float cuve_min_rad, const char* system, float tesseract_size = 200.f);
-    void create_surface(std::vector<float>& vars, std::vector<std::vector<double>>& initial, const char* system, float tesseract_size = 200.f);
+    void create_surface(std::vector<float>& vars, std::vector<std::vector<double>>& initial, const char* system, glm::vec2 &integration_steps_size, float tesseract_size = 200.f);
 
 
 private:

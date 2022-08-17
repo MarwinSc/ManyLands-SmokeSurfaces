@@ -33,26 +33,22 @@ float angle_between_vectors(vec3 v1, vec3 v2)
     return acos(d) * (180.0 / 3.141592653589793238463);
 }
 
-float calculate_opacity(vec3 v1, vec3 v2, vec3 v3, vec3 camera, vec3 normal, float surface_height)
+float calculate_opacity(vec3 v1, vec3 v2, vec3 v3, vec3 camera, vec3 normal, float surface_height, float curvature)
 {
     //alpha density
     float area = triangle_area(v1,v2,v3);
     float angle = angle_between_vectors(camera,normal);
     float density = clamp(surface_height / (area * angle), 0.0f, 1.0f);
+
     //alpha shape
     float d0 = length(v3-v2);
     float d1 = length(v1-v3);
     float d2 = length(v2-v1);
     float max_distance = max(d0,max(d1,d2));
-    float exponent = 0.3;
+    float exponent = 0.5;
     float shape = pow((4.0 * area) / (sqrt(3) * max_distance), exponent);
-    return clamp(density * shape, 0.0, 1.0);
-}
 
-vec3 calculate_normal(vec3 v1, vec3 v2, vec3 v3){
-    vec3 e1 = v1 - v2;
-    vec3 e2 = v3 - v2;
-    return cross(e1,e2);
+    return clamp(density * shape * curvature , 0.0, 1.0);
 }
 
 void main(){
@@ -64,12 +60,13 @@ void main(){
     position = gl_in[2].gl_Position;
     vec3 v3 = vec3(position.x, position.y, position.z);
 
-    vec3 normal = normalize(calculate_normal(v1, v2, v3));
+    vec3 normal = gs_in[0].Normal;
     //vec3 normal = gs_in[0].Normal;
-    float opacity = calculate_opacity(v1, v2, v3, camera, normal, surface_height);
+    float opacity = calculate_opacity(v1, v2, v3, camera, normal, surface_height, gs_in[0].Color.w);
     gl_Position = gl_in[0].gl_Position;
     vec4 color = gs_in[0].Color;
     Color = vec4(color.x, color.y, color.z, opacity);
+    //Color = vec4(normal, 1.0);
     FragPos = v1;
     Normal = normal;
     CameraPos = camera;
@@ -77,10 +74,11 @@ void main(){
     EmitVertex();
 
     normal = gs_in[1].Normal;
-    opacity = calculate_opacity(v1, v2, v3, camera, normal, surface_height);
+    opacity = calculate_opacity(v1, v2, v3, camera, normal, surface_height, gs_in[1].Color.w);
     gl_Position = gl_in[1].gl_Position;
     color = gs_in[1].Color;
     Color = vec4(color.x, color.y, color.z, opacity);
+    //Color = vec4(normal, 1.0);
     FragPos = v2;
     Normal = normal;
     CameraPos = camera;
@@ -88,10 +86,11 @@ void main(){
     EmitVertex();
 
     normal = gs_in[2].Normal;
-    opacity = calculate_opacity(v1, v2, v3, camera, normal, surface_height);
+    opacity = calculate_opacity(v1, v2, v3, camera, normal, surface_height, gs_in[2].Color.w);
     gl_Position = gl_in[2].gl_Position;
     color = gs_in[2].Color;
     Color = vec4(color.x, color.y, color.z, opacity);
+    //Color = vec4(normal, 1.0);
     FragPos = v3;
     Normal = normal;
     CameraPos = camera;

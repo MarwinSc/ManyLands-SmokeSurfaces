@@ -119,7 +119,7 @@ void main() {
             vert_3D = vert_3D - disp_3D;
         }
     }
-
+    
     Position_Out[nr] = vert_3D;
 }
 

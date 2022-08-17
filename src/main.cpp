@@ -122,6 +122,7 @@ auto Curve_max_deviation(0.8f);
 glm::vec4 initial_position = glm::vec4(3.0, 3.0, 3.0, 1.0),
 second_initial_position = glm::vec4(5.0, 5.0, 5.0, 5.0);
 glm::vec3 system_parameter = glm::vec3(28.0, 10.0, 0.375);
+glm::vec2 integration_steps_size = glm::vec2(100.0, 1.0);
 //nr of trajectories
 int nr_of_trajectories = 5;
 //draw curve from first and last point
@@ -129,7 +130,7 @@ bool draw_curves = false;
 bool wireframe_on = false;
 //system dropdown 
 const char* current_item = NULL;
-const char* items[] = { "Lorenz", "Bipolar", "PO_Reaction", "test"};
+const char* items[] = { "Lorenz", "Bipolar", "PO_Reaction", "test", "test_2"};
 //******************************************************************************
 // Color_to_ImVec4
 //******************************************************************************
@@ -663,6 +664,10 @@ void mainloop()
                         initial_position = glm::vec4(1.0, 1.0, 1.0, 1.0),
                         second_initial_position = glm::vec4(5.0, 1.0, 1.0, 1.0);
                     }
+                    if (current_item == "test_2") {
+                        initial_position = glm::vec4(1.0, 1.0, 1.0, 1.0),
+                        second_initial_position = glm::vec4(5.0, 1.0, 1.0, 1.0);
+                    }
                 }
                 ImGui::EndCombo();
             }
@@ -680,6 +685,7 @@ void mainloop()
 
                 ImGui::SliderFloat4("From Initial", (float*)&initial_position, -10.0f, 10.0f);
                 ImGui::SliderFloat4("To   Initial", (float*)&second_initial_position, -10.0f, 10.0f);
+                ImGui::InputFloat2("Integration Steps & Width", (float*)&integration_steps_size);
 
                 if (ImGui::Button("Create_Curve")) {
                     Scene_objs.create_ode(system_parameter[0], system_parameter[1], system_parameter[2], initial_position[0], initial_position[1], initial_position[2], initial_position[3],Curve_max_deviation, current_item);
@@ -716,7 +722,7 @@ void mainloop()
                         vars->push_back(system_parameter[2]);
 
                         auto initial = std::make_shared<std::vector<std::vector<double>>>();
-                        initial->push_back(std::vector<double>{initial_position[0], initial_position[1], initial_position[2], second_initial_position[3]});
+                        initial->push_back(std::vector<double>{initial_position[0], initial_position[1], initial_position[2], initial_position[3]});
 
                         //points between point 1 and 2
                         glm::vec4 from_to = second_initial_position - initial_position;
@@ -733,7 +739,7 @@ void mainloop()
 
                         initial->push_back(std::vector<double>{second_initial_position[0], second_initial_position[1], second_initial_position[2], second_initial_position[3]});
 
-                        Scene_objs.create_surface(*vars, *initial, current_item);
+                        Scene_objs.create_surface(*vars, *initial, current_item, integration_steps_size);
 
                         if (draw_curves) {
                             Scene_objs.create_ode(system_parameter[0], system_parameter[1], system_parameter[2], initial_position[0], initial_position[1], initial_position[2], initial_position[3], Curve_max_deviation, current_item);
