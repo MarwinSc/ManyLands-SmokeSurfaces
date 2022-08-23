@@ -47,15 +47,22 @@ public:
     std::vector<int>          adjacency;
     std::vector<glm::ivec2>   adjacency_offset;
 
-
     int surface_width;
     float surface_height = 1.0f;
     glm::vec4 c;
     Shader shader;
     Shader shader_normal = Shader("assets/surface.vert", "assets/normal.frag", "assets/normal.geom");
+    Shader compositeShader = Shader("assets/composite.vert", "assets/composite.frag");
+    Shader screenShader = Shader("assets/screen.vert", "assets/screen.frag");
+
     ComputeShader shader_compute = ComputeShader("assets/compute_shader.comp");
     ComputeShader shader_compute_normals = ComputeShader("assets/vertex_normals.comp");
     ComputeShader shader_compute_curvature = ComputeShader("assets/curvature.comp");
+
+    //TODO hardcoded ScreenWidth and Height
+    int SCR_WIDTH = 1920;
+    int SCR_HEIGHT = 1080;
+    GLint dims[4] = { 0 };
 
     Drawable_Streamsurface(Shader& shader_): 
         shader(shader_)
@@ -75,10 +82,29 @@ public:
         this->surface_height = surface_height;
     }
 
+    void check_viewport_change(GLint dims[4]) {
+        for (int i = 0; i < 4; i++) {
+            if (this->dims[i] != dims[i]) {
+                SCR_WIDTH = dims[2];
+                SCR_HEIGHT = dims[3];
+                change_framebuffers();
+                for (int i = 0; i < 4; i++) {
+                    this->dims[i] = dims[i];
+                }
+                return;
+            }
+        }
+    }
+
     // render the mesh
     void Draw(glm::mat4& mvp, glm::mat3& normalMatrix, glm::vec3& camera)
     {
-        enableBlendMode();
+        //enableBlendMode();
+
+        //viewport size
+        GLint dims[4] = { 0 };
+        glGetIntegerv(GL_VIEWPORT, dims);
+        check_viewport_change(dims);
 
         shader.use();
         shader.setMat4("mvp", mvp);
@@ -87,18 +113,44 @@ public:
         shader.setVec3("camera", camera);
         shader.setFloat("surface_height", surface_height);
 
+        //copy backbuffer to opaqueFBO
+        glBindFramebuffer(GL_FRAMEBUFFER, opaqueFBO);
+        //
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+
+        //
+        //TODO
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        //TODO
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, opaqueFBO);
+        glBlitFramebuffer(dims[0], dims[1], SCR_WIDTH + dims[0], SCR_HEIGHT + dims[1], 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        glBlitFramebuffer(dims[0], dims[1], SCR_WIDTH + dims[0], SCR_HEIGHT + dims[1], 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+
+        // configure render states
+        // disable depth writes so transparent objects wouldn't interfere with solid pass depth values
+        glDepthMask(GL_FALSE);
+        glEnable(GL_BLEND);
+        glBlendFunci(0, GL_ONE, GL_ONE); // accumulation blend target
+        glBlendFunci(1, GL_ZERO, GL_ONE_MINUS_SRC_COLOR); // revealge blend target
+        glBlendEquation(GL_FUNC_ADD);
+
+        // bind transparent framebuffer to render transparent objects
+        glBindFramebuffer(GL_FRAMEBUFFER, transparentFBO);
+
+        glClearBufferfv(GL_COLOR, 0, &zeroFillerVec[0]);
+        glClearBufferfv(GL_COLOR, 1, &oneFillerVec[0]);
+
         if(flag_use_computeshader){
             glBindVertexArray(vaos[1]); // bind VAO
             glDrawElements(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, 0);
-
-
             glBindVertexArray(0);
             //glUseProgram(0);
         }
         else {
 
-            //glEnable(GL_BLEND);
-            //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             /*
             glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, tbo);
             glBeginTransformFeedback(GL_TRIANGLES);
@@ -121,9 +173,48 @@ public:
             }
             std::cout << "\n";
             */
-            glActiveTexture(GL_TEXTURE0);
+            //glActiveTexture(GL_TEXTURE0);
         }
-        disableBlendMode();
+        //disableBlendMode();
+        
+
+        glDepthFunc(GL_ALWAYS);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // bind opaque framebuffer
+        glBindFramebuffer(GL_FRAMEBUFFER, opaqueFBO);
+
+        // use composite shader
+        compositeShader.use();
+
+        // draw screen quad
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, accumTexture);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, revealTexture);
+        glBindVertexArray(quadVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        //return;
+        // set render states
+        glDisable(GL_DEPTH);
+        glDepthMask(GL_TRUE); // enable depth writes so glClear won't ignore clearing the depth buffer
+        glDisable(GL_BLEND);
+
+        // bind backbuffer
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(dims[0], dims[1], dims[2], dims[3]);
+
+        // use screen shader
+        screenShader.use();
+
+        // draw final screen quad
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, opaqueTexture);
+        glBindVertexArray(quadVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+
     }
 
     void Draw_Normals(glm::mat4& mvp, glm::mat3& normalMatrix, glm::mat4& projectionMatrix, glm::vec3& camera) {
@@ -936,9 +1027,95 @@ public:
             glBindBuffer(GL_ARRAY_BUFFER, tbo);
             glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec4) * indices.size(), nullptr, GL_STATIC_READ);
         }
+
+        //stuff for OIT do anyway 
+
+        glGenFramebuffers(1, &opaqueFBO);
+        glGenFramebuffers(1, &transparentFBO);
+
+        // set up attachments for opaque framebuffer
+        glGenTextures(1, &opaqueTexture);
+        glBindTexture(GL_TEXTURE_2D, opaqueTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_HALF_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        glGenTextures(1, &depthTexture);
+        glBindTexture(GL_TEXTURE_2D, depthTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SCR_WIDTH, SCR_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, opaqueFBO);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, opaqueTexture, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture, 0);
+
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+            std::cout << "ERROR::FRAMEBUFFER:: Opaque framebuffer is not complete!" << std::endl;
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        
+        // set up attachments for transparent framebuffer
+        glGenTextures(1, &accumTexture);
+        glBindTexture(GL_TEXTURE_2D, accumTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_HALF_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        glGenTextures(1, &revealTexture);
+        glBindTexture(GL_TEXTURE_2D, revealTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, SCR_WIDTH, SCR_HEIGHT, 0, GL_RED, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, transparentFBO);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, accumTexture, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, revealTexture, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture, 0); // opaque framebuffer's depth texture
+
+        const GLenum transparentDrawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+        glDrawBuffers(2, transparentDrawBuffers);
+
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+            std::cout << "ERROR::FRAMEBUFFER:: Transparent framebuffer is not complete!" << std::endl;
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        glBindVertexArray(0);
+
+        // quad VAO
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+        glBindVertexArray(0);
     }
 
+    void change_framebuffers() {
+        glBindTexture(GL_TEXTURE_2D, opaqueTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_HALF_FLOAT, NULL);
+        glBindTexture(GL_TEXTURE_2D, 0);
 
+        glBindTexture(GL_TEXTURE_2D, depthTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SCR_WIDTH, SCR_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        glBindTexture(GL_TEXTURE_2D, accumTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_HALF_FLOAT, NULL);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        glBindTexture(GL_TEXTURE_2D, revealTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, SCR_WIDTH, SCR_HEIGHT, 0, GL_RED, GL_FLOAT, NULL);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+    }
 
     void get_boundaries(Scene_vertex_t& origin, Scene_vertex_t& size)
     {
@@ -983,6 +1160,8 @@ private:
 
     unsigned int VAO, VBO, EBO;
     GLuint tbo;
+
+    //uniforms 
     boost::numeric::ublas::matrix<float> projection_4D;
     boost::numeric::ublas::matrix<float> rot_mat;
     boost::numeric::ublas::matrix<float> rot_mat_unfolding;
@@ -996,6 +1175,14 @@ private:
     Scene_vertex_t translate;
     Scene_vertex_t scale;
     glm::mat4 transform3D = glm::mat4(1.0f);
+    float coeff = 0.0f;
+    float coeff_2 = 0.0f;
+    float tesseract_size = 200.0f;
+    float tesseract_size_2 = 200.0f;
+    GLuint move_index = 0;
+    GLuint move_index_2 = 0;
+
+    //flags
     bool flag_update = false;
     bool flag_tesseract_unfolding = false;
     bool flag_move_to_3D = false;
@@ -1003,13 +1190,6 @@ private:
     bool flag_plot_unfolding = false;
     bool flag_move_to_2D = false;
     bool flag_second_rotate_2D = false;
-
-    float coeff = 0.0f;
-    float coeff_2 = 0.0f;
-    float tesseract_size = 200.0f;
-    float tesseract_size_2 = 200.0f;
-    GLuint move_index = 0;
-    GLuint move_index_2 = 0;
 
     //compute shader 
     unsigned int ssbo [2];
@@ -1023,6 +1203,23 @@ private:
     bool flag_use_computeshader = true;
     unsigned int atomic_counter;
 
+    //OIT
+    unsigned int opaqueFBO, transparentFBO;
+    unsigned int opaqueTexture, depthTexture, revealTexture, accumTexture;
+    glm::vec4 zeroFillerVec = glm::vec4(0.0, 0.0, 0.0, 0.0);
+    glm::vec4 oneFillerVec = glm::vec4(1.0, 1.0, 1.0, 1.0);
+    glm::vec4 debugFillerVec = glm::vec4(1.0, 0.0, 0.0, 1.0);
+    float quadVertices [30] = {
+        // positions        // uv
+        -1.0f, -1.0f, 0.0f,	0.0f, 0.0f,
+         1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+         1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+
+         1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+        -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f, 0.0f, 0.0f
+    };
+    unsigned int quadVAO, quadVBO;
 
     bool matrix_equal(const boost::numeric::ublas::matrix<float>& m, const boost::numeric::ublas::matrix<float>& n)
     {
@@ -1054,8 +1251,6 @@ private:
         glDisable(GL_BLEND);
         glDepthMask(GL_TRUE);
     }
-
-
 };
 
 #endif

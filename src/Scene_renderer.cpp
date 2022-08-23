@@ -66,6 +66,11 @@ void Scene_renderer::render()
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_DEPTH_TEST);
+    //TODO check 
+    glDepthFunc(GL_LESS);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     
     if(state_            == nullptr ||
        state_->tesseract == nullptr ||
@@ -214,17 +219,17 @@ void Scene_renderer::render()
 
             for (size_t si = 0; si < state_->surfaces.size(); ++si)
             {
+                if (state_->draw_normals) {
+                    state_->surfaces.at(si)->Draw_Normals(mvp_mat, norm_mat, proj_mat, state_->camera_3D);
+                }
                 state_->surfaces.at(si)->set_rotation(rot_m);
                 state_->surfaces.at(si)->set_projection_camera(state_->projection_4D, state_->camera_4D);
                 state_->surfaces.at(si)->set_surface_height(state_->surface_height);
                 state_->surfaces.at(si)->set_color(state_->get_curve_color(si));
                 state_->surfaces.at(si)->update_and_buffer_vertex_data();
                 state_->surfaces.at(si)->Draw(mvp_mat, norm_mat, state_->camera_3D);
-                if (state_->draw_normals) {
-                    state_->surfaces.at(si)->Draw_Normals(mvp_mat, norm_mat, proj_mat, state_->camera_3D);
-                }
-
             }
+
             //make sure the default shader program is used again
             glUseProgram(diffuse_shader_->program_id);
         }

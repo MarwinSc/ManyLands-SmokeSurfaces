@@ -693,8 +693,8 @@ void mainloop()
 
                 if (ImGui::CollapsingHeader("Surface")) {
 
-                    ImGui::SliderInt("Nr of Trajectories", &nr_of_trajectories, 2, 40);
-                    ImGui::SliderFloat("Surface Height", &State->surface_height, 0.01f, 2.0f);
+                    ImGui::SliderInt("Nr of Trajectories", &nr_of_trajectories, 2, 100);
+                    ImGui::SliderFloat("Surface Height", &State->surface_height, 0.001f, 1.0f);
 
                     ImGui::BeginGroup;
                     ImGui::Checkbox("Draw Boundary Curves", &draw_curves);
@@ -1000,8 +1000,8 @@ int main(int, char**)
         "ManyLands",
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
-        1280,
-        720,
+        1920,
+        1080,
         Window_flags);
     Gl_context = SDL_GL_CreateContext(MainWindow);
     SDL_GL_SetSwapInterval(1); // Enable vsync

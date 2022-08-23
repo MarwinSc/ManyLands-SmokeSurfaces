@@ -104,8 +104,8 @@ public:
         glAttachShader(ID, fragment);
 
         //DEBUG
-        const GLchar* feedbackVaryings[] = { "Debug" };
-        glTransformFeedbackVaryings(ID, 1, feedbackVaryings, GL_INTERLEAVED_ATTRIBS);
+        //const GLchar* feedbackVaryings[] = { "Debug" };
+        //glTransformFeedbackVaryings(ID, 1, feedbackVaryings, GL_INTERLEAVED_ATTRIBS);
         //-----------
 
         glLinkProgram(ID);
