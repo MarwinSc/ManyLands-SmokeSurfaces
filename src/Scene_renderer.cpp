@@ -93,6 +93,13 @@ void Scene_renderer::render()
                static_cast<GLsizei>(display_scale_x_ * region_.width()),
                static_cast<GLsizei>(display_scale_y_ * region_.height()));
 
+    if (state_->wireframe) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    }
+    else {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    }
+
     std::vector<float> anims =
         split_animation(state_->unfolding_anim, number_of_animations_);
     float hide_4D = anims[0],
@@ -222,12 +229,17 @@ void Scene_renderer::render()
                 if (state_->draw_normals) {
                     state_->surfaces.at(si)->Draw_Normals(mvp_mat, norm_mat, proj_mat, state_->camera_3D);
                 }
+                if (state_->wireframe) {
+                    state_->surfaces.at(si)->wireframe = true;
+                }
                 state_->surfaces.at(si)->set_rotation(rot_m);
                 state_->surfaces.at(si)->set_projection_camera(state_->projection_4D, state_->camera_4D);
+                state_->surfaces.at(si)->set_3Dcamera(state_->camera_3D, state_->rotation_3D);
                 state_->surfaces.at(si)->set_surface_height(state_->surface_height);
+                state_->surfaces.at(si)->set_shape_exponent(state_->shape_exponent);
                 state_->surfaces.at(si)->set_color(state_->get_curve_color(si));
                 state_->surfaces.at(si)->update_and_buffer_vertex_data();
-                state_->surfaces.at(si)->Draw(mvp_mat, norm_mat, state_->camera_3D);
+                state_->surfaces.at(si)->Draw(mvp_mat, norm_mat);
             }
 
             //make sure the default shader program is used again
@@ -342,17 +354,24 @@ void Scene_renderer::render()
                         //if (i != 0){// && i != 4 && i != 1){
 
                         auto s = surfaces_3d[si][i];
-
-                        s.set_rotation(rot);
-                        s.set_projection_camera(state_->projection_4D, state_->camera_4D);
-                        s.set_surface_height(state_->surface_height);
-                        s.set_color(state_->get_curve_color(si));
-                        //TODO dont force update 
-                        s.update_and_buffer_vertex_data(false);
-                        s.Draw(mvp_mat, norm_mat, state_->camera_3D);
                         if (state_->draw_normals) {
                             s.Draw_Normals(mvp_mat, norm_mat, proj_mat, state_->camera_3D);
                         }
+                        if (state_->wireframe) {
+                            state_->surfaces.at(si)->wireframe = true;
+                        } else {
+                            state_->surfaces.at(si)->wireframe = false;
+                        }
+                        s.set_rotation(rot);
+                        s.set_projection_camera(state_->projection_4D, state_->camera_4D);
+                        s.set_3Dcamera(state_->camera_3D, state_->rotation_3D);
+                        s.set_surface_height(state_->surface_height);
+                        s.set_shape_exponent(state_->shape_exponent);
+                        s.set_color(state_->get_curve_color(si));
+                        //TODO dont force update 
+                        s.update_and_buffer_vertex_data(false);
+                        s.Draw(mvp_mat, norm_mat);
+
                         //make sure the default shader program is used again
                         glUseProgram(diffuse_shader_->program_id);
                         //}
@@ -419,7 +438,9 @@ void Scene_renderer::render()
                 {
                     s.set_rotation(rot);
                     s.set_projection_camera(state_->projection_4D, state_->camera_4D);
+                    s.set_3Dcamera(state_->camera_3D, state_->rotation_3D);
                     s.set_surface_height(state_->surface_height);
+                    s.set_shape_exponent(state_->shape_exponent);
                     s.update(false);
 
                     //TODO dont force update 
@@ -469,13 +490,19 @@ void Scene_renderer::render()
                 {
                     for (auto& s : surfaces_2d[si]){
 
-                        s.buffer_vertex_data();
-                        s.compute();
-                        s.set_color(state_->get_curve_color(si));
-                        s.Draw(mvp_mat, norm_mat, state_->camera_3D);
                         if (state_->draw_normals) {
                             s.Draw_Normals(mvp_mat, norm_mat, proj_mat, state_->camera_3D);
                         }
+                        if (state_->wireframe) {
+                            state_->surfaces.at(si)->wireframe = true;
+                        } else {
+                            state_->surfaces.at(si)->wireframe = false;
+                        }
+                        s.buffer_vertex_data();
+                        s.compute();
+                        s.set_color(state_->get_curve_color(si));
+                        s.Draw(mvp_mat, norm_mat);
+
                         //make sure the default shader program is used again
                         glUseProgram(diffuse_shader_->program_id);
                     }

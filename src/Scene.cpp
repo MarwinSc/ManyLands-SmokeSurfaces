@@ -320,9 +320,7 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
     auto tg = std::make_unique<Trajectory_generator>();
     auto trajectories = std::make_unique<std::vector<std::vector<double>>>();
 
-    Shader shader("assets/surface.vert", "assets/surface.frag", "assets/surface.geom");
-    //Shader shader("assets/surface.vert", "assets/surface.frag");
-    auto surface = std::make_shared<Drawable_Streamsurface>(shader);
+    auto surface = std::make_shared<Drawable_Streamsurface>();
     surface->set_color(state_->get_curve_color(state_->surfaces.size()));
 
     if (state_->use_cpu) {

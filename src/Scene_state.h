@@ -70,13 +70,15 @@ public:
         use_unique_curve_colors,
         use_distance_treshold,
         draw_normals,
-        use_cpu;
+        use_cpu,
+        wireframe;
 
     float stat_kernel_size,
-          stat_max_movement,
-          stat_max_value,
-          surface_height,
-          unfoldingstate_lastframe;
+        stat_max_movement,
+        stat_max_value,
+        surface_height,
+        unfoldingstate_lastframe,
+        shape_exponent;
 
     std::array<float, 4> tesseract_size;
 

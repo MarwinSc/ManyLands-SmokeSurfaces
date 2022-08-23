@@ -8,7 +8,8 @@ layout (location = 1) out float reveal;
 in vec4 Color;
 in vec3 Normal;
 in vec3 FragPos;
-in vec3 CameraPos;
+
+uniform vec3 camera;
 
 void main()
 {
@@ -17,7 +18,7 @@ void main()
     //FragColor = vec4(Normal,1.0);
 
     //ambient
-    vec3 LightPos = CameraPos; 
+    vec3 LightPos = camera; 
     vec3 lightColor = vec3(1.0,1.0,1.0);
 
     float ambientStrength = 0.4;
@@ -36,8 +37,8 @@ void main()
     float weight = clamp(pow(min(1.0, Color.w * 10.0) + 0.01, 3.0) * 1e8 * pow(1.0 - gl_FragCoord.z * 0.9, 3.0), 1e-2, 3e3);
 
     // store pixel color accumulation
-    accum = vec4(Color.xyz * Color.w, Color.w) * weight;
-    //accum = vec4(resultColor.xyz * Color.w, Color.w) * weight;
+    //accum = vec4(Color.xyz * Color.w, Color.w) * weight;
+    accum = vec4(resultColor.xyz * Color.w, Color.w) * weight;
 
     // store pixel revealage threshold
     reveal = Color.w;

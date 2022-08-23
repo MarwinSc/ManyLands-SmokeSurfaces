@@ -12,6 +12,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/quaternion.hpp>
+
 #include "Shader.h"
 #include "Scene_state.h"
 #include "Scene_vertex_t.h"
@@ -46,28 +49,24 @@ public:
     std::vector<glm::vec4>    positions;
     std::vector<int>          adjacency;
     std::vector<glm::ivec2>   adjacency_offset;
-
+    bool wireframe = false;
     int surface_width;
-    float surface_height = 1.0f;
     glm::vec4 c;
-    Shader shader;
+    Shader shader = Shader("assets/surface.vert", "assets/surface.frag");// , "assets/surface.geom");;
     Shader shader_normal = Shader("assets/surface.vert", "assets/normal.frag", "assets/normal.geom");
     Shader compositeShader = Shader("assets/composite.vert", "assets/composite.frag");
     Shader screenShader = Shader("assets/screen.vert", "assets/screen.frag");
 
     ComputeShader shader_compute = ComputeShader("assets/compute_shader.comp");
     ComputeShader shader_compute_normals = ComputeShader("assets/vertex_normals.comp");
-    ComputeShader shader_compute_curvature = ComputeShader("assets/curvature.comp");
+    ComputeShader shader_compute_opacity = ComputeShader("assets/opacity.comp");
 
     //TODO hardcoded ScreenWidth and Height
     int SCR_WIDTH = 1920;
     int SCR_HEIGHT = 1080;
     GLint dims[4] = { 0 };
 
-    Drawable_Streamsurface(Shader& shader_): 
-        shader(shader_)
-    {
-    }
+    Drawable_Streamsurface(){}
 
     //TODO update color for all vertices on call
     void set_color(const Color& c) {
@@ -80,6 +79,15 @@ public:
 
     void set_surface_height(float surface_height) {
         this->surface_height = surface_height;
+    }
+
+    void set_shape_exponent(float shape_exponent) {
+        this->shape_exponent = shape_exponent;
+    }
+
+    void set_3Dcamera(glm::vec3& camera, glm::quat& rotation) {
+        glm::mat4 rotationMatrix = glm::toMat4(rotation);
+        this->camera = glm::vec3(rotationMatrix * glm::vec4(camera, 1.0f));
     }
 
     void check_viewport_change(GLint dims[4]) {
@@ -97,7 +105,7 @@ public:
     }
 
     // render the mesh
-    void Draw(glm::mat4& mvp, glm::mat3& normalMatrix, glm::vec3& camera)
+    void Draw(glm::mat4& mvp, glm::mat3& normalMatrix)
     {
         //enableBlendMode();
 
@@ -111,12 +119,10 @@ public:
         shader.setMat3("normalMatrix", normalMatrix);
 
         shader.setVec3("camera", camera);
-        shader.setFloat("surface_height", surface_height);
 
         //copy backbuffer to opaqueFBO
         glBindFramebuffer(GL_FRAMEBUFFER, opaqueFBO);
         //
-        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
         //
         //TODO
@@ -139,6 +145,7 @@ public:
 
         // bind transparent framebuffer to render transparent objects
         glBindFramebuffer(GL_FRAMEBUFFER, transparentFBO);
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
         glClearBufferfv(GL_COLOR, 0, &zeroFillerVec[0]);
         glClearBufferfv(GL_COLOR, 1, &oneFillerVec[0]);
@@ -185,6 +192,10 @@ public:
         // bind opaque framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, opaqueFBO);
 
+        if (wireframe) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
+
         // use composite shader
         compositeShader.use();
 
@@ -214,7 +225,9 @@ public:
         glBindVertexArray(quadVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
-
+        if (wireframe) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        }
     }
 
     void Draw_Normals(glm::mat4& mvp, glm::mat3& normalMatrix, glm::mat4& projectionMatrix, glm::vec3& camera) {
@@ -678,7 +691,7 @@ public:
         glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER); // stop writing to buffer
         // memory barrier, to make sure everything from the compute shader is written
         glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
-
+        //TODO remove
         //debugging read
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
         std::vector<glm::vec4> storage(positions.size());
@@ -690,14 +703,18 @@ public:
 
     void compute_curvature() {
          
-        shader_compute_curvature.use();
+        shader_compute_opacity.use();
+
+        shader_compute_opacity.setVec3("camera", camera);
+        shader_compute_opacity.setFloat("surface_height", surface_height);
+        shader_compute_opacity.setFloat("shape_exponent", shape_exponent);
 
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo[1]);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo_indices);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ssbo_adjacency);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, ssbo_adjacency_offset);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, ssbo_normals);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, ssbo_curvature);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, ssbo_opacity);
         glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 6, atomic_counter);
 
         GLuint groups = (vertices.size() / (256 * 1 * 1)) + 1; // +1 because of integer division
@@ -712,10 +729,10 @@ public:
         glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER); // stop writing to buffer
         // memory barrier, to make sure everything from the compute shader is written
         glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
-
+        //TODO remove
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
         std::vector<float> storage(positions.size());
-        glGetNamedBufferSubData(ssbo_curvature, 0, positions.size() * sizeof(float), &storage[0]);
+        glGetNamedBufferSubData(ssbo_opacity, 0, positions.size() * sizeof(float), &storage[0]);
 
     }
 
@@ -941,8 +958,8 @@ public:
             glBufferData(GL_SHADER_STORAGE_BUFFER, positions.size() * sizeof(glm::vec2), &adjacency_offset[0], GL_STATIC_DRAW);
 
             //curvature buffer 
-            glGenBuffers(1, &ssbo_curvature);
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_curvature);
+            glGenBuffers(1, &ssbo_opacity);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_opacity);
             glBufferData(GL_SHADER_STORAGE_BUFFER, positions.size() * sizeof(float), NULL, GL_STATIC_DRAW);
 
             //normal buffer 
@@ -986,8 +1003,8 @@ public:
             glEnableVertexAttribArray(2);
             glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 0, NULL);
 
-            // vertex normal
-            glBindBuffer(GL_ARRAY_BUFFER, ssbo_curvature);
+            //vertex opacity
+            glBindBuffer(GL_ARRAY_BUFFER, ssbo_opacity);
             glEnableVertexAttribArray(3);
             glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 0, NULL);
 
@@ -1181,6 +1198,9 @@ private:
     float tesseract_size_2 = 200.0f;
     GLuint move_index = 0;
     GLuint move_index_2 = 0;
+    float surface_height = 1.0f;
+    float shape_exponent = 0.5;
+    glm::vec3 camera = glm::vec3(0.0, 0.0, -1.0);
 
     //flags
     bool flag_update = false;
@@ -1197,7 +1217,7 @@ private:
     unsigned int ssbo_indices;
     unsigned int ssbo_adjacency;
     unsigned int ssbo_adjacency_offset;
-    unsigned int ssbo_curvature;
+    unsigned int ssbo_opacity;
     unsigned int ssbo_normals;
     GLuint vaos[2]; // one VAO for each SSBO
     bool flag_use_computeshader = true;

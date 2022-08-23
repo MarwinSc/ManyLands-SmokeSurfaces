@@ -37,6 +37,8 @@ Scene_state::Scene_state()
     , draw_normals(false)
     , unfoldingstate_lastframe(0.0f)
     , use_cpu(false)
+    , wireframe(false)
+    , shape_exponent(0.5)
 {
     curve_colors_.emplace_back(Color(228,  26,  28));
     curve_colors_.emplace_back(Color( 55, 126, 184));

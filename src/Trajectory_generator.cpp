@@ -73,6 +73,16 @@ void test_2(const state_type& x, state_type& dxdt, const double t) {
     dxdt[3] = k4*x[2];
 }
 
+void pendulum(const state_type& x, state_type& dxdt, const double t) {
+
+    float a = 0.1;
+
+    dxdt[0] = x[1];
+    dxdt[1] = -sin(1.5*x[0]) - a * x[1];
+    dxdt[2] = 0.1;
+    dxdt[3] = 0.1;
+}
+
 enum System {Lorenz = 'l', Bipolar = 'b', PO_Reaction = 'p'};
 
 std::vector<double> Trajectory_generator::integrate(std::vector<float>& vars, const char* system, double integration_end, double step_size) {
@@ -102,6 +112,9 @@ std::vector<double> Trajectory_generator::integrate(std::vector<float>& vars, co
     }
     if (system == "test_2") {
         size_t steps = boost::numeric::odeint::integrate(test_2, initial, 0.0, integration_end, step_size, push_back_state_and_time(x_vec, times));
+    }
+    if (system == "pendulum") {
+        size_t steps = boost::numeric::odeint::integrate(pendulum, initial, 0.0, integration_end, step_size, push_back_state_and_time(x_vec, times));
     }
 
     std::vector<double> coordinates;

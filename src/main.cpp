@@ -130,7 +130,7 @@ bool draw_curves = false;
 bool wireframe_on = false;
 //system dropdown 
 const char* current_item = NULL;
-const char* items[] = { "Lorenz", "Bipolar", "PO_Reaction", "test", "test_2"};
+const char* items[] = { "Lorenz", "Bipolar", "PO_Reaction", "test", "test_2", "pendulum"};
 //******************************************************************************
 // Color_to_ImVec4
 //******************************************************************************
@@ -668,6 +668,10 @@ void mainloop()
                         initial_position = glm::vec4(1.0, 1.0, 1.0, 1.0),
                         second_initial_position = glm::vec4(5.0, 1.0, 1.0, 1.0);
                     }
+                    if (current_item == "pendulum") {
+                        initial_position = glm::vec4(0.0, 1.0, 0.0, 0.5),
+                        second_initial_position = glm::vec4(0.0, 0.95, 2.2, 0.7);
+                    }
                 }
                 ImGui::EndCombo();
             }
@@ -695,24 +699,15 @@ void mainloop()
 
                     ImGui::SliderInt("Nr of Trajectories", &nr_of_trajectories, 2, 100);
                     ImGui::SliderFloat("Surface Height", &State->surface_height, 0.001f, 1.0f);
+                    ImGui::SliderFloat("Shape Exponent", &State->shape_exponent, 0.1f, 2.0f);
 
                     ImGui::BeginGroup;
                     ImGui::Checkbox("Draw Boundary Curves", &draw_curves);
                     ImGui::Checkbox("Distance Treshold", &State->use_distance_treshold);
                     ImGui::Checkbox("Draw Normals", &State->draw_normals);
                     ImGui::Checkbox("Use CPU", &State->use_cpu);
-
+                    ImGui::Checkbox("Wireframe", &State->wireframe);
                     ImGui::EndGroup;
-
-
-                    if (ImGui::Checkbox("Wireframe", &wireframe_on)) {
-                        if (wireframe_on) {
-                            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                        }
-                        else {
-                            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                        }
-                    }
 
                     if (ImGui::Button("Create_Surface")) {
 
