@@ -5,7 +5,6 @@ layout (triangle_strip, max_vertices = 3) out;
 in VS_OUT {
     vec4 Color;
     vec3 Normal;
-    vec4 Debug;
 } gs_in[];
 
 out vec4 Color;
@@ -16,6 +15,7 @@ out vec4 Debug;
 
 uniform vec3 camera;
 uniform float surface_height;
+uniform float shape_exponent;
 
 float triangle_area(vec3 v1, vec3 v2, vec3 v3)
 {
@@ -45,10 +45,9 @@ float calculate_opacity(vec3 v1, vec3 v2, vec3 v3, vec3 camera, vec3 normal, flo
     float d1 = length(v1-v3);
     float d2 = length(v2-v1);
     float max_distance = max(d0,max(d1,d2));
-    float exponent = 0.5;
-    float shape = pow((4.0 * area) / (sqrt(3) * max_distance), exponent);
+    float shape = clamp(pow((4.0 * area) / (sqrt(3) * max_distance), shape_exponent) , 0.0, 1.0);
 
-    return clamp(density * shape * curvature , 0.0, 1.0);
+    return density * shape * curvature;
 }
 
 void main(){
@@ -70,7 +69,6 @@ void main(){
     FragPos = v1;
     Normal = normal;
     CameraPos = camera;
-    Debug = gs_in[0].Debug;
     EmitVertex();
 
     normal = gs_in[1].Normal;
@@ -82,7 +80,6 @@ void main(){
     FragPos = v2;
     Normal = normal;
     CameraPos = camera;
-    Debug = gs_in[1].Debug;
     EmitVertex();
 
     normal = gs_in[2].Normal;
@@ -94,7 +91,6 @@ void main(){
     FragPos = v3;
     Normal = normal;
     CameraPos = camera;
-    Debug = gs_in[2].Debug;
     EmitVertex();
 
     EndPrimitive();

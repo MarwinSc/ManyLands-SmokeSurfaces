@@ -45,6 +45,8 @@ public:
 
     boost::numeric::ublas::matrix<float> projection_4D;
     Scene_vertex_t camera_4D;
+    Scene_vertex_t total_origin;
+    Scene_vertex_t total_size;
 
     float xy_rot, yz_rot, zx_rot, xw_rot, yw_rot, zw_rot;
     float fov_y;
@@ -78,7 +80,8 @@ public:
         stat_max_value,
         surface_height,
         unfoldingstate_lastframe,
-        shape_exponent;
+        shape_exponent,
+        curvature_influence;
 
     std::array<float, 4> tesseract_size;
 

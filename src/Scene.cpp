@@ -125,7 +125,7 @@ void Scene::load_ode(
 // generates trajectories during runtime
 //******************************************************************************
 
-std::shared_ptr<Curve> Scene::create_ode(float a, float b, float c, float x, float y, float z, float w, float cuve_min_rad, const char* system, float tesseract_size/* = 200.f*/) {
+std::shared_ptr<Curve> Scene::create_ode(float x, float y, float z, float w, glm::vec2& integration_steps_size, float cuve_min_rad, const char* system, bool adaptive, float tesseract_size/* = 200.f*/) {
 
     //++
     /*
@@ -142,6 +142,7 @@ std::shared_ptr<Curve> Scene::create_ode(float a, float b, float c, float x, flo
     s = tesseract_size;
 
     // The aggregative origin and size for all curves
+    /*
     Scene_vertex_t total_origin(5), total_size(5);
     for (char i = 0; i < 5; ++i)
     {
@@ -149,16 +150,21 @@ std::shared_ptr<Curve> Scene::create_ode(float a, float b, float c, float x, flo
         total_size(i) = std::numeric_limits<float>::min();
     }
     //--
-
+    */
     auto curve = std::make_shared<Curve>();
     auto tg = std::make_unique<Trajectory_generator>();
 
-    std::vector<float> vars{ a,b,c,x,y,z,w };
+    std::vector<float> vars{ x,y,z,w };
 
-    std::vector<double> coordinates = tg->integrate(vars, system);
+    std::vector<double> coordinates = tg->integrate(vars, system, integration_steps_size[0], integration_steps_size[1], adaptive);
     Scene_vertex_t p(5);
 
     for (int i = 0; i < coordinates.size() - 5; i += 5) {
+
+        if ((i < coordinates.size() - 10) && !(isfinite(coordinates.at(i + 6)) && isfinite(coordinates.at(i + 7)) && isfinite(coordinates.at(i + 8)) && isfinite(coordinates.at(i + 9)))) {
+            std::cout << "break at " << i / 5 << std::endl;
+            break;
+        }
 
         p <<= coordinates.at(i + 1), coordinates.at(i + 2), coordinates.at(i + 3), coordinates.at(i + 4), 1;
         float t = coordinates.at(i);
@@ -177,8 +183,8 @@ std::shared_ptr<Curve> Scene::create_ode(float a, float b, float c, float x, flo
 
     for (char i = 0; i < 5; ++i)
     {
-        if (total_origin(i) > origin(i)) total_origin(i) = origin(i);
-        if (total_size(i) < size(i)) total_size(i) = size(i);
+        if (state_->total_origin(i) > origin(i)) state_->total_origin(i) = origin(i);
+        if (state_->total_size(i) < size(i)) state_->total_size(i) = size(i);
     }
 
     if (!state_->scale_tesseract)
@@ -186,24 +192,24 @@ std::shared_ptr<Curve> Scene::create_ode(float a, float b, float c, float x, flo
         float max_size = std::numeric_limits<float>::min();
         for (char i = 0; i < 4; ++i)
         {
-            if (max_size < total_size(i)) max_size = total_size(i);
+            if (max_size < state_->total_size(i)) max_size = state_->total_size(i);
         }
 
         for (char i = 0; i < 4; ++i)
         {
             state_->tesseract_size[i] =
-                tesseract_size * total_size[i] / max_size;
+                tesseract_size * state_->total_size[i] / max_size;
         }
     }
 
     Scene_vertex_t scale(5);
-    scale[0] = state_->tesseract_size[0] / total_size[0];
-    scale[1] = state_->tesseract_size[1] / total_size[1];
-    scale[2] = state_->tesseract_size[2] / total_size[2];
-    scale[3] = state_->tesseract_size[3] / total_size[3];
+    scale[0] = state_->tesseract_size[0] / state_->total_size[0];
+    scale[1] = state_->tesseract_size[1] / state_->total_size[1];
+    scale[2] = state_->tesseract_size[2] / state_->total_size[2];
+    scale[3] = state_->tesseract_size[3] / state_->total_size[3];
     scale[4] = 1;
-    
-    curve->translate_vertices(-0.5f * total_size - total_origin);
+
+    curve->translate_vertices(-0.5f * state_->total_size - state_->total_origin);
     
     curve->scale_vertices(scale);
 
@@ -311,7 +317,7 @@ void Scene::create_tesseract()
 // create_surface
 //******************************************************************************
 
-void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<double>> &initial, const char* system, glm::vec2 &integration_steps_size, float tesseract_size/* = 200.f*/)
+void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<double>> &initial, const char* system, glm::vec2 &integration_steps_size, bool adaptive, float tesseract_size/* = 200.f*/)
 {
     // Reset size of the tesseract
     for (auto& s : state_->tesseract_size)
@@ -327,6 +333,7 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
         surface->disable_compute_flag();
     }
 
+    /*
     // The aggregative origin and size for all curves
     Scene_vertex_t total_origin(5), total_size(5);
     for (char i = 0; i < 5; ++i)
@@ -334,19 +341,18 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
         total_origin(i) = std::numeric_limits<float>::max();
         total_size(i) = std::numeric_limits<float>::min();
     }
+    */
 
     //calculate trajectories
     for (std::vector<double> p : initial) {
 
-        //concatenate initial coordinates to the system parameters 
-        // TODO currently only x,y,z
-        std::vector<float> temp_vars(vars);
+        std::vector<float> temp_vars;
         temp_vars.push_back(p.at(0));
         temp_vars.push_back(p.at(1));
         temp_vars.push_back(p.at(2));
         temp_vars.push_back(p.at(3));
 
-        std::vector<double> trajectory = tg->integrate(temp_vars, system, integration_steps_size[0], integration_steps_size[1]);
+        std::vector<double> trajectory = tg->integrate(temp_vars, system, integration_steps_size[0], integration_steps_size[1], adaptive);
         //mean of trajectory
         //auto const count = static_cast<double>(trajectory.size());
         //auto mean = std::reduce(trajectory.begin(), trajectory.end()) / count;
@@ -355,16 +361,36 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
 
     }
     //create Streamsurface object
+
+    //ensure trajectories are all the same length 
     int minimum = INT_MAX;
+    int scale_max = INT_MAX;
     for (int i = 0; i < trajectories->size(); i++) {
+        for (int ii = 0; ii < trajectories->at(i).size() - 5; ii+=5) {
+            bool finite = (isfinite(trajectories->at(i).at(ii + 1)) && isfinite(trajectories->at(i).at(ii + 2)) && isfinite(trajectories->at(i).at(ii + 3)) && isfinite(trajectories->at(i).at(ii + 4)));
+            bool max_scale = ((trajectories->at(i).at(ii + 1) < scale_max) && (trajectories->at(i).at(ii + 2) < scale_max) && (trajectories->at(i).at(ii + 3) < scale_max) && (trajectories->at(i).at(ii + 4) < scale_max));
+            if (!finite || !max_scale) {
+                std::cout << "break at " << ii / 5 << std::endl;
+                if (ii < minimum) {
+                    minimum = ii;
+                }
+                break;
+            }
+        }
         if (trajectories->at(i).size() < minimum) {
             minimum = trajectories->at(i).size();
         }
     }
 
-    for (int i = 0; i < minimum; i+=5) {
+    //dodge exception if trajectories get to short 
+    if (minimum < 20) {
+        return;
+    }
+
+    for (int i = 0; i < minimum - 10; i+=5) {
         std::vector<Scene_vertex_t> points;
         for (int ii = 0; ii < trajectories->size(); ii++) {
+
             Scene_vertex_t p(5);
             p <<= trajectories->at(ii).at(i + 1), trajectories->at(ii).at(i + 2), trajectories->at(ii).at(i + 3), trajectories->at(ii).at(i + 4), 1;
             points.push_back(p);
@@ -382,10 +408,11 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
     //origin and size
     Scene_vertex_t origin(5), size(5);
     surface->get_boundaries(origin, size);
+
     for (char i = 0; i < 5; ++i)
     {
-        if (total_origin(i) > origin(i)) total_origin(i) = origin(i);
-        if (total_size(i) < size(i)) total_size(i) = size(i);
+        if (state_->total_origin(i) > origin(i)) state_->total_origin(i) = origin(i);
+        if (state_->total_size(i) < size(i)) state_->total_size(i) = size(i);
     }
 
     //surfaces.push_back(std::move(surface));
@@ -396,23 +423,23 @@ void Scene::create_surface(std::vector<float> &vars, std::vector<std::vector<dou
         float max_size = std::numeric_limits<float>::min();
         for (char i = 0; i < 4; ++i)
         {
-            if (max_size < total_size(i)) max_size = total_size(i);
+            if (max_size < state_->total_size(i)) max_size = state_->total_size(i);
         }
 
         for (char i = 0; i < 4; ++i)
         {
-            state_->tesseract_size[i] = tesseract_size * total_size[i] / max_size;
+            state_->tesseract_size[i] = tesseract_size * state_->total_size[i] / max_size;
         }
     }
 
     Scene_vertex_t scale(5);
-    scale[0] = state_->tesseract_size[0] / total_size[0];
-    scale[1] = state_->tesseract_size[1] / total_size[1];
-    scale[2] = state_->tesseract_size[2] / total_size[2];
-    scale[3] = state_->tesseract_size[3] / total_size[3];
+    scale[0] = state_->tesseract_size[0] / state_->total_size[0];
+    scale[1] = state_->tesseract_size[1] / state_->total_size[1];
+    scale[2] = state_->tesseract_size[2] / state_->total_size[2];
+    scale[3] = state_->tesseract_size[3] / state_->total_size[3];
     scale[4] = 1;
 
-    Scene_vertex_t translate = -0.5f * total_size - total_origin;
+    Scene_vertex_t translate = -0.5f * state_->total_size - state_->total_origin;
 
     surface->translate_vertices(translate);
     surface->scale_vertices(scale);

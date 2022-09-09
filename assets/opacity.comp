@@ -13,6 +13,7 @@ layout (binding = 6, offset = 0) uniform atomic_uint Count;
 uniform vec3 camera;
 uniform float surface_height;
 uniform float shape_exponent;
+uniform float curvature_influence;
 
 float calculate_area(vec3 v1, vec3 v2, vec3 v3);
 float calculate_angle(vec3 v_1, vec3 v_2, vec3 v_3);
@@ -82,12 +83,9 @@ void main() {
        if(temp > smoke_max){
             smoke_max = temp;
        }
-
     }
 
-
-    float b = 2.0f;
-    float curvature = clamp(1 - b * smoke_max,0.0,1.0);
+    float curvature = clamp(1 - curvature_influence * smoke_max,0.0,1.0);
 
     Opacity_Out[nr] = density_min * shape_min * curvature;
 }

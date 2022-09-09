@@ -13,7 +13,7 @@ typedef std::vector< double > state_type;
 
 class Trajectory_generator {
 public:
-    std::vector<double> integrate(std::vector<float>& vars, const char* system, double integration_end = 100.0f, double step_size = 1.0f);
+    std::vector<double> integrate(std::vector<float>& vars, const char* system, double integration_end = 100.0f, double step_size = 1.0f, bool adaptive = true);
 
 private:
 

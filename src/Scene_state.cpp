@@ -32,13 +32,17 @@ Scene_state::Scene_state()
     , stat_kernel_size(0.01f)
     , stat_max_movement(0.01f)
     , stat_max_value(0.01f)
-    , use_distance_treshold(false)
+    //added
     , surface_height(1.0f)
     , draw_normals(false)
     , unfoldingstate_lastframe(0.0f)
     , use_cpu(false)
     , wireframe(false)
     , shape_exponent(0.5)
+    , curvature_influence(2.0)
+    , total_origin(Scene_vertex_t(5))
+    , total_size(Scene_vertex_t(5))
+    
 {
     curve_colors_.emplace_back(Color(228,  26,  28));
     curve_colors_.emplace_back(Color( 55, 126, 184));
@@ -48,6 +52,12 @@ Scene_state::Scene_state()
     curve_colors_.emplace_back(Color(255, 255,  51));
     curve_colors_.emplace_back(Color(166,  86,  40));
     curve_colors_.emplace_back(Color(247, 129, 191));
+
+    for (char i = 0; i < 5; ++i)
+    {
+        total_origin(i) = std::numeric_limits<float>::max();
+        total_size(i) = std::numeric_limits<float>::min();
+    }
 }
 
 //******************************************************************************

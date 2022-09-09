@@ -64,6 +64,4 @@ void sphere(
     const glm::vec4& color,
     Mesh& mesh);
 
-void surface(Streamsurface& s, Mesh& surface_mesh, const Color& c, glm::vec3 &camera_pos, bool use_distance_treshold, float surface_height);
-
 } // namespace Mesh_generator

@@ -31,6 +31,7 @@ void main()
     vec3 diffuse = diff * lightColor;
             
     vec3 resultColor = vec3(Color.x,Color.y,Color.z)* (ambient + diffuse);
+    float alpha = clamp(Color.w,0.0,1.0);
     //FragColor = vec4(result, Color.w); //
     
     // weight function

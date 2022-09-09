@@ -48,6 +48,7 @@
 
 //MarwinTest
 #include "Trajectory_generator.h"
+#include <random>
 
 //#define DEBUG
 
@@ -128,9 +129,12 @@ int nr_of_trajectories = 5;
 //draw curve from first and last point
 bool draw_curves = false;
 bool wireframe_on = false;
+bool adaptive_integration = true;
+bool randomize = false;
+glm::vec2 randomize_bounds = glm::vec2(-10.0f, 10.0f);
 //system dropdown 
 const char* current_item = NULL;
-const char* items[] = { "Lorenz", "Bipolar", "PO_Reaction", "test", "test_2", "pendulum"};
+const char* items[] = { "Lorenz", "Bipolar", "PO_Reaction", "NF_KB_Pathway", "test", "test_2", "bouali_1", "pendulum", "huang", "bouali_2", "bouali_3", "toxin"};
 //******************************************************************************
 // Color_to_ImVec4
 //******************************************************************************
@@ -658,63 +662,123 @@ void mainloop()
                     if (current_item == "Lorenz") {
                         initial_position = glm::vec4(3.0, 3.0, 3.0, 1.0);
                         second_initial_position = glm::vec4(5.0, 5.0, 5.0, 5.0);
-                        system_parameter = glm::vec3(28.0, 10.0, 0.375);
+                        //system_parameter = glm::vec3(28.0, 10.0, 0.375);
+                        integration_steps_size = glm::vec2(30.0f, 1.0f);
+                    }
+                    if (current_item == "PO_Reaction") {
+                        initial_position = glm::vec4(0.0, 0.0, 0.0, 0.0);
+                        second_initial_position = glm::vec4(1.0, 4.0, 0.0, 0.0);
+                        integration_steps_size = glm::vec2(300.0f,0.1f);
+                        nr_of_trajectories = 2;
+                    }
+                    if (current_item == "Bipolar") {
+                        initial_position = glm::vec4(0.0, 0.0, 1.8, 0.0);
+                        second_initial_position = glm::vec4(0.5, 0.0, 1.8, 0.0);
+                        integration_steps_size = glm::vec2(10.0f, 1.0f);
+                    }
+                    if (current_item == "NF_KB_Pathway") {
+                        initial_position = glm::vec4(0.4, 6.0, 0.0, 5.0);
+                        second_initial_position = glm::vec4(0.1, 6.0, 0.0, 5.0);
+                        integration_steps_size = glm::vec2(200.0f, 0.1f);
                     }
                     if (current_item == "test") {
                         initial_position = glm::vec4(1.0, 1.0, 1.0, 1.0),
                         second_initial_position = glm::vec4(5.0, 1.0, 1.0, 1.0);
+                        integration_steps_size = glm::vec2(100.0f, 1.0f);
                     }
                     if (current_item == "test_2") {
+                        initial_position = glm::vec4(0.0, 0.0, 0.0, 0.0),
+                        second_initial_position = glm::vec4(5.0, 1.0, 1.0, 1.0);
+                        integration_steps_size = glm::vec2(10.0f, 1.0f);
+                    }
+                    if (current_item == "bouali_1") {
                         initial_position = glm::vec4(1.0, 1.0, 1.0, 1.0),
                         second_initial_position = glm::vec4(5.0, 1.0, 1.0, 1.0);
+                        integration_steps_size = glm::vec2(20.0f, 1.0f);
                     }
                     if (current_item == "pendulum") {
                         initial_position = glm::vec4(0.0, 1.0, 0.0, 0.5),
                         second_initial_position = glm::vec4(0.0, 0.95, 2.2, 0.7);
+                        integration_steps_size = glm::vec2(20.0f, 1.0f);
+                    }
+                    if (current_item == "huang") {
+                        initial_position = glm::vec4(9.0, 10.0, 0.0, 0.0),
+                        second_initial_position = glm::vec4(10.0, 10.0, 0.0, 0.0);
+                        integration_steps_size = glm::vec2(20.0f, 1.0f);
+                    }
+                    if (current_item == "bouali_2") {
+                        initial_position = glm::vec4(0.1, 0.1, 0.1, 0.1),
+                        second_initial_position = glm::vec4(1.0, 1.0, 0.1, 0.1);
+                        integration_steps_size = glm::vec2(20.0f, 1.0f);
+                    }
+                    if (current_item == "bouali_3") {
+                        initial_position = glm::vec4(2.0, 2.0, 2.0, 2.0),
+                        second_initial_position = glm::vec4(1.0, 1.0, 1.0, 1.0);
+                        integration_steps_size = glm::vec2(20.0f, 1.0f);
                     }
                 }
                 ImGui::EndCombo();
             }
-            
+
+            ImGui::Checkbox("Randomize", &randomize);
+            ImGui::InputFloat2("Randomize Bounds", (float*)&randomize_bounds);
 
             if (current_item == "Lorenz") {
                 ImGui::Text("Lorenz: ");
-                ImGui::SliderFloat3("Sys Parameters", (float*)&system_parameter, -30.0f, 30.0f);
-            }
-            if (current_item == "test") {
-                ImGui::Text("Test: ");
+                //ImGui::SliderFloat3("Sys Parameters", (float*)&system_parameter, -30.0f, 30.0f);
             }
 
             if (current_item != NULL) {
 
                 ImGui::SliderFloat4("From Initial", (float*)&initial_position, -10.0f, 10.0f);
                 ImGui::SliderFloat4("To   Initial", (float*)&second_initial_position, -10.0f, 10.0f);
+                ImGui::Checkbox("Adaptive", &adaptive_integration);
                 ImGui::InputFloat2("Integration Steps & Width", (float*)&integration_steps_size);
 
                 if (ImGui::Button("Create_Curve")) {
-                    Scene_objs.create_ode(system_parameter[0], system_parameter[1], system_parameter[2], initial_position[0], initial_position[1], initial_position[2], initial_position[3],Curve_max_deviation, current_item);
+                    Scene_objs.create_ode(initial_position[0], initial_position[1], initial_position[2], initial_position[3], integration_steps_size, Curve_max_deviation, current_item, adaptive_integration);
                 }
 
                 if (ImGui::CollapsingHeader("Surface")) {
 
                     ImGui::SliderInt("Nr of Trajectories", &nr_of_trajectories, 2, 100);
-                    ImGui::SliderFloat("Surface Height", &State->surface_height, 0.001f, 1.0f);
-                    ImGui::SliderFloat("Shape Exponent", &State->shape_exponent, 0.1f, 2.0f);
+                    ImGui::SliderFloat("Surface Height", &State->surface_height, 0.00001f, 0.1f);
+                    ImGui::SliderFloat("Shape Exponent", &State->shape_exponent, 0.001f, 2.0f);
+                    ImGui::SliderFloat("Curvature Influence", &State->curvature_influence, -5.0f, 5.0f);
 
                     ImGui::BeginGroup;
                     ImGui::Checkbox("Draw Boundary Curves", &draw_curves);
-                    ImGui::Checkbox("Distance Treshold", &State->use_distance_treshold);
+                    //ImGui::Checkbox("Distance Treshold", &State->use_distance_treshold);
                     ImGui::Checkbox("Draw Normals", &State->draw_normals);
-                    ImGui::Checkbox("Use CPU", &State->use_cpu);
+                    //ImGui::Checkbox("Use CPU", &State->use_cpu);
                     ImGui::Checkbox("Wireframe", &State->wireframe);
                     ImGui::EndGroup;
 
                     if (ImGui::Button("Create_Surface")) {
 
+                        //reset
+                        for (char i = 0; i < 5; ++i)
+                        {
+                            State->total_origin(i) = std::numeric_limits<float>::max();
+                            State->total_size(i) = std::numeric_limits<float>::min();
+                        }
+
+                        if (randomize) {
+
+                            std::random_device rd;
+                            std::default_random_engine eng(rd());
+                            std::uniform_real_distribution<float> distr(randomize_bounds[0], randomize_bounds[1]);
+
+                            for (int i = 0; i < 4; i++) {
+                                initial_position[i] = distr(eng);
+                                second_initial_position[i] = distr(eng);
+                            }
+                        }
+
                         auto vars = std::make_shared<std::vector<float>>();
-                        vars->push_back(system_parameter[0]);
-                        vars->push_back(system_parameter[1]);
-                        vars->push_back(system_parameter[2]);
+                        //vars->push_back(system_parameter[0]);
+                        //vars->push_back(system_parameter[1]);
+                        //vars->push_back(system_parameter[2]);
 
                         auto initial = std::make_shared<std::vector<std::vector<double>>>();
                         initial->push_back(std::vector<double>{initial_position[0], initial_position[1], initial_position[2], initial_position[3]});
@@ -734,11 +798,11 @@ void mainloop()
 
                         initial->push_back(std::vector<double>{second_initial_position[0], second_initial_position[1], second_initial_position[2], second_initial_position[3]});
 
-                        Scene_objs.create_surface(*vars, *initial, current_item, integration_steps_size);
+                        Scene_objs.create_surface(*vars, *initial, current_item, integration_steps_size, adaptive_integration);
 
                         if (draw_curves) {
-                            Scene_objs.create_ode(system_parameter[0], system_parameter[1], system_parameter[2], initial_position[0], initial_position[1], initial_position[2], initial_position[3], Curve_max_deviation, current_item);
-                            Scene_objs.create_ode(system_parameter[0], system_parameter[1], system_parameter[2], second_initial_position[0], second_initial_position[1], second_initial_position[2], second_initial_position[3], Curve_max_deviation, current_item);
+                            Scene_objs.create_ode( initial_position[0], initial_position[1], initial_position[2], initial_position[3], integration_steps_size, Curve_max_deviation, current_item, adaptive_integration);
+                            Scene_objs.create_ode( second_initial_position[0], second_initial_position[1], second_initial_position[2], second_initial_position[3], integration_steps_size, Curve_max_deviation, current_item, adaptive_integration);
                         }
                     }
                 }

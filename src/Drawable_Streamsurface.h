@@ -61,7 +61,6 @@ public:
     ComputeShader shader_compute_normals = ComputeShader("assets/vertex_normals.comp");
     ComputeShader shader_compute_opacity = ComputeShader("assets/opacity.comp");
 
-    //TODO hardcoded ScreenWidth and Height
     int SCR_WIDTH = 1920;
     int SCR_HEIGHT = 1080;
     GLint dims[4] = { 0 };
@@ -83,6 +82,10 @@ public:
 
     void set_shape_exponent(float shape_exponent) {
         this->shape_exponent = shape_exponent;
+    }
+
+    void set_curvature_influence(float curvature_influence) {
+        this->curvature_influence = curvature_influence;
     }
 
     void set_3Dcamera(glm::vec3& camera, glm::quat& rotation) {
@@ -228,6 +231,7 @@ public:
         if (wireframe) {
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         }
+        wireframe = false;
     }
 
     void Draw_Normals(glm::mat4& mvp, glm::mat3& normalMatrix, glm::mat4& projectionMatrix, glm::vec3& camera) {
@@ -691,12 +695,12 @@ public:
         glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER); // stop writing to buffer
         // memory barrier, to make sure everything from the compute shader is written
         glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
+        
         //TODO remove
         //debugging read
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
-        std::vector<glm::vec4> storage(positions.size());
-        glGetNamedBufferSubData(ssbo_normals, 0, positions.size() * sizeof(glm::vec4), &storage[0]);
-
+        //glMemoryBarrier(GL_ALL_BARRIER_BITS);
+        //std::vector<glm::vec4> storage(positions.size());
+        //glGetNamedBufferSubData(ssbo_normals, 0, positions.size() * sizeof(glm::vec4), &storage[0]);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     }
@@ -707,8 +711,9 @@ public:
 
         shader_compute_opacity.setVec3("camera", camera);
         shader_compute_opacity.setFloat("surface_height", surface_height);
-        shader_compute_opacity.setFloat("shape_exponent", shape_exponent);
-
+        shader_compute_opacity.setFloat("shape_exponent", shape_exponent); 
+        shader_compute_opacity.setFloat("curvature_influence", curvature_influence);
+        
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo[1]);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo_indices);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ssbo_adjacency);
@@ -729,11 +734,12 @@ public:
         glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER); // stop writing to buffer
         // memory barrier, to make sure everything from the compute shader is written
         glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
+        
         //TODO remove
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
-        std::vector<float> storage(positions.size());
-        glGetNamedBufferSubData(ssbo_opacity, 0, positions.size() * sizeof(float), &storage[0]);
-
+        //glMemoryBarrier(GL_ALL_BARRIER_BITS);
+        //std::vector<float> storage(positions.size());
+        //glGetNamedBufferSubData(ssbo_opacity, 0, positions.size() * sizeof(float), &storage[0]);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
 
     //--------------------Unfolding---------------------------------------------
@@ -1200,6 +1206,7 @@ private:
     GLuint move_index_2 = 0;
     float surface_height = 1.0f;
     float shape_exponent = 0.5;
+    float curvature_influence = 2.0;
     glm::vec3 camera = glm::vec3(0.0, 0.0, -1.0);
 
     //flags

@@ -66,10 +66,11 @@ void Scene_renderer::render()
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_DEPTH_TEST);
+    
     //TODO check 
-    glDepthFunc(GL_LESS);
-    glDepthMask(GL_TRUE);
-    glDisable(GL_BLEND);
+    //glDepthFunc(GL_LESS);
+    //glDepthMask(GL_TRUE);
+    //glDisable(GL_BLEND);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     
     if(state_            == nullptr ||
@@ -175,7 +176,6 @@ void Scene_renderer::render()
         project_to_3D(projected_c[ci].get_vertices(), rot_m);
     }
 
-
     // Same For surfaces
     std::vector<Drawable_Streamsurface> projected_s;
 
@@ -195,7 +195,7 @@ void Scene_renderer::render()
     if(state_->unfolding_anim == 0)
     {
         // Draw tesseract
-        if(state_->show_tesseract)
+        if (state_->show_tesseract)
             draw_tesseract(projected_t);
 
         // Draw 4D curve
@@ -237,6 +237,7 @@ void Scene_renderer::render()
                 state_->surfaces.at(si)->set_3Dcamera(state_->camera_3D, state_->rotation_3D);
                 state_->surfaces.at(si)->set_surface_height(state_->surface_height);
                 state_->surfaces.at(si)->set_shape_exponent(state_->shape_exponent);
+                state_->surfaces.at(si)->set_curvature_influence(state_->curvature_influence);
                 state_->surfaces.at(si)->set_color(state_->get_curve_color(si));
                 state_->surfaces.at(si)->update_and_buffer_vertex_data();
                 state_->surfaces.at(si)->Draw(mvp_mat, norm_mat);
@@ -367,16 +368,15 @@ void Scene_renderer::render()
                         s.set_3Dcamera(state_->camera_3D, state_->rotation_3D);
                         s.set_surface_height(state_->surface_height);
                         s.set_shape_exponent(state_->shape_exponent);
+                        s.set_curvature_influence(state_->curvature_influence);
                         s.set_color(state_->get_curve_color(si));
                         //TODO dont force update 
                         s.update_and_buffer_vertex_data(false);
                         s.Draw(mvp_mat, norm_mat);
-
-                        //make sure the default shader program is used again
-                        glUseProgram(diffuse_shader_->program_id);
-                        //}
                     }
                 }
+                //make sure the default shader program is used again
+                glUseProgram(diffuse_shader_->program_id);
             }
             state_->unfoldingstate_lastframe = hide_4D;
         }
@@ -441,6 +441,7 @@ void Scene_renderer::render()
                     s.set_3Dcamera(state_->camera_3D, state_->rotation_3D);
                     s.set_surface_height(state_->surface_height);
                     s.set_shape_exponent(state_->shape_exponent);
+                    s.set_curvature_influence(state_->curvature_influence);
                     s.update(false);
 
                     //TODO dont force update 
@@ -503,14 +504,17 @@ void Scene_renderer::render()
                         s.set_color(state_->get_curve_color(si));
                         s.Draw(mvp_mat, norm_mat);
 
-                        //make sure the default shader program is used again
-                        glUseProgram(diffuse_shader_->program_id);
                     }
                 }
+                //make sure the default shader program is used again
+                glUseProgram(diffuse_shader_->program_id);
             } 
             state_->unfoldingstate_lastframe = hide_3D;
         }
     }
+
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glDepthFunc(GL_LESS);
 
     if(back_geometry_->data_array.size() > 0)
     {
@@ -648,7 +652,8 @@ void Scene_renderer::project_to_3D(
     tmp_vert = tmp_vert - state_->camera_4D;
     tmp_vert = prod(tmp_vert, state_->projection_4D);
 
-    assert(tmp_vert(3) > 0);
+    //TODO
+    //assert(tmp_vert(3) > 0);
 
     tmp_vert(0) /= tmp_vert(4);
     tmp_vert(1) /= tmp_vert(4);
