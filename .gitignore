@@ -1,0 +1,16 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs
+/include/SDL2
+/lib
+/x64/Debug
+*.user
+*.filters
+*.vcxproj
+*.sln
+/out/build/x64-Debug
+/Debug/Manylands.tlog
+/Debug
+/x64/Release
