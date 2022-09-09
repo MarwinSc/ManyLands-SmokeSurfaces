@@ -1,0 +1,111 @@
+#version 430
+#define PI 3.1415926538
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in; // work group size
+
+layout(std430, binding = 0) buffer Pos1 { vec4 Position_In[]; };
+layout(std430, binding = 1) buffer Indices { uint Indices_In[]; };
+layout(std430, binding = 2) buffer Adjacency { int Adjacency_In[]; };
+layout(std430, binding = 3) buffer Adjacency_Offset { ivec2 Adjacency_Offset_In[]; };
+layout(std430, binding = 4) buffer Normals { vec4 Normals_In[]; };
+layout(std430, binding = 5) buffer Curvature { float Curvature_Out[]; };
+layout (binding = 6, offset = 0) uniform atomic_uint Count; 
+
+float calculate_area(vec3 v1, vec3 v2, vec3 v3);
+float calculate_angle(vec3 v_1, vec3 v_2, vec3 v_3);
+float cotan(float angle);
+bool in_array(int[6] arr, uint elem);
+
+void main() {
+
+    uint nr = atomicCounterIncrement(Count);
+    vec4 aPos = Position_In[nr];
+    int offset = Adjacency_Offset_In[nr][0];
+    int nr_of_neighbours = Adjacency_Offset_In[nr][1];
+    //int visited[6] = int[6](-1,-1,-1,-1,-1,-1);
+
+    float sum_area = 0.0f;
+    float sum_angle = 0.0f;
+
+    vec3 laplace_beltrami = vec3(0.0f,0.0f,0.0f);
+    float debug = 0.0f;
+
+    float smoke_max = 0.0f;
+
+    for (int i = 0; i<nr_of_neighbours; i++){
+       int adjacent_triangle_idx = Adjacency_In[offset + i];
+
+       uint vertex_idx1 = Indices_In[adjacent_triangle_idx * 3];
+       uint vertex_idx2 = Indices_In[adjacent_triangle_idx * 3 + 1];
+       uint vertex_idx3 = Indices_In[adjacent_triangle_idx * 3 + 2];
+
+       vec3 v1 = vec3(aPos.x,aPos.y,aPos.z);
+       vec3 v2;
+       vec3 v3;
+
+       uint newV2index;
+
+       if(nr == vertex_idx1){
+            v2 = vec3(Position_In[vertex_idx2].xyz);
+            v3 = vec3(Position_In[vertex_idx3].xyz);
+            //newV2index = vertex_idx2;
+       }else if(nr == vertex_idx2){
+            v2 = vec3(Position_In[vertex_idx3].xyz);
+            v3 = vec3(Position_In[vertex_idx1].xyz);
+            //newV2index = vertex_idx3;
+       }else{// if(nr == vertex_idx3){
+            v2 = vec3(Position_In[vertex_idx1].xyz);
+            v3 = vec3(Position_In[vertex_idx2].xyz);
+            //newV2index = vertex_idx1;
+       }
+
+       sum_angle += (180/PI) * calculate_angle(v1,v2,v3);
+       sum_area += calculate_area(v1,v2,v3);
+
+       //float alpha =  calculate_angle(v2,v1,v3);
+       //float beta = calculate_angle(v3,v1,v2);
+       //float L = (cotan(alpha) + cotan(beta));
+       //laplace_beltrami += L * (v1 - v2);
+
+       vec3 e = (v2 - v1) / length((v2 - v1));
+       float temp = dot(e,Normals_In[nr].xyz);
+       if(temp > smoke_max){
+            smoke_max = temp;
+       }
+
+    }
+       //Gaussian Curvature         (2.0f*PI-sum_angle)/(sum_area/3.0f);
+
+       //laplace_beltrami = (1/(4*sum_area)) * laplace_beltrami;
+       //length(laplace_beltrami) / 2.0f;
+
+    float b = 2.0f;
+    float smoke_curv = clamp(1 - b * smoke_max,0.0,1.0);
+
+    Curvature_Out[nr] = smoke_curv;
+}
+
+bool in_array(int[6] arr, uint elem){
+    for (int i = 0; i < 6; i++){
+        if(arr[i] == elem){
+            return true;
+        }
+    }
+    return false;
+}
+
+float cotan(float angle){
+    return 1/tan(angle);
+}
+
+float calculate_angle(vec3 v_1, vec3 v_2, vec3 v_3){
+    vec3 v1_2 = v_2 - v_1;
+    vec3 v1_3 = v_3 - v_1; 
+    return acos(dot(normalize(v1_2),normalize(v1_3)));
+}
+
+float calculate_area(vec3 v1, vec3 v2, vec3 v3){
+    vec3 v1_2 = v2 - v1;
+    vec3 v1_3 = v3 - v1; 
+    return 0.5 * length(cross(v1_2,v1_3));
+}
+

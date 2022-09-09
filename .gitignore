@@ -3,6 +3,7 @@
 ################################################################################
 
 /.vs
+<<<<<<< HEAD
 /include/SDL2
 /lib
 /x64/Debug
@@ -14,3 +15,5 @@
 /Debug/Manylands.tlog
 /Debug
 /x64/Release
+=======
+>>>>>>> StreamSurface
