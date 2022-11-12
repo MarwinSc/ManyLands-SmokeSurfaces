@@ -42,14 +42,18 @@ Scene_state::Scene_state()
     , curvature_influence(2.0)
     , total_origin(Scene_vertex_t(5))
     , total_size(Scene_vertex_t(5))
+    , screenshot(false)
+    , screenshot_width(3840.0f)
+    , screenshot_height(2160.0f)
+    , screenshot_filename("image.png")
     
 {
     curve_colors_.emplace_back(Color(228,  26,  28));
     curve_colors_.emplace_back(Color( 55, 126, 184));
-    curve_colors_.emplace_back(Color( 77, 175,  74));
-    curve_colors_.emplace_back(Color(152,  78, 163));
     curve_colors_.emplace_back(Color(255, 127,   0));
+    curve_colors_.emplace_back(Color(152, 78, 163));
     curve_colors_.emplace_back(Color(255, 255,  51));
+    curve_colors_.emplace_back(Color(77, 175, 74));
     curve_colors_.emplace_back(Color(166,  86,  40));
     curve_colors_.emplace_back(Color(247, 129, 191));
 

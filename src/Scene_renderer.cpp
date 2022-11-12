@@ -16,6 +16,12 @@
 #include <glm/gtx/quaternion.hpp>
 // ImGui
 #include "imgui.h"
+// STB_IMAGE
+#define STB_IMAGE_IMPLEMENTATION
+#include<stb_image.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include<stb_image_write.h>
+
 
 //******************************************************************************
 // Scene_renderer
@@ -93,6 +99,11 @@ void Scene_renderer::render()
                static_cast<GLint>(display_scale_y_ * region_.bottom()),
                static_cast<GLsizei>(display_scale_x_ * region_.width()),
                static_cast<GLsizei>(display_scale_y_ * region_.height()));
+
+    if (state_-> screenshot)
+    {
+        glViewport(0, 0, state_->screenshot_width, state_->screenshot_height);
+    }
 
     if (state_->wireframe) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -525,6 +536,19 @@ void Scene_renderer::render()
     {
         front_geometry_->init_buffers();
         diffuse_shader_->draw_geometry(front_geometry_);
+    }
+
+    if (state_->screenshot) {
+        GLsizei nrChannels = 3;
+        GLsizei stride = nrChannels * state_->screenshot_width;
+        stride += (stride % 4) ? (4 - stride % 4) : 0;
+        GLsizei bufferSize = stride * state_->screenshot_height;
+        std::vector<char> buffer(bufferSize);
+        glPixelStorei(GL_PACK_ALIGNMENT, 4);
+        glReadBuffer(GL_BACK);
+        glReadPixels(0, 0, state_->screenshot_width, state_->screenshot_height, GL_RGB, GL_UNSIGNED_BYTE, buffer.data());
+        stbi_flip_vertically_on_write(true);
+        stbi_write_jpg(state_->screenshot_filename, state_->screenshot_width, state_->screenshot_height, nrChannels, buffer.data(), stride);
     }
 
     // On screen rendering -----------------------------------------------------

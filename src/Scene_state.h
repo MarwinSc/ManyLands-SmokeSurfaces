@@ -73,7 +73,8 @@ public:
         use_distance_treshold,
         draw_normals,
         use_cpu,
-        wireframe;
+        wireframe,
+        screenshot;
 
     float stat_kernel_size,
         stat_max_movement,
@@ -82,6 +83,11 @@ public:
         unfoldingstate_lastframe,
         shape_exponent,
         curvature_influence;
+
+    unsigned int screenshot_width,
+        screenshot_height;
+
+    char screenshot_filename[64];
 
     std::array<float, 4> tesseract_size;
 

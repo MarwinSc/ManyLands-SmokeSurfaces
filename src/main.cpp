@@ -808,13 +808,23 @@ void mainloop()
                 }
             }
 
-
+            ImGui::InputInt("Screenshot Width", (int*)& State->screenshot_width);
+            ImGui::InputInt("Screenshot Height", (int*)& State->screenshot_height);
+            ImGui::InputText("Filename", State->screenshot_filename, IM_ARRAYSIZE(State->screenshot_filename));
+            if (ImGui::Button("Screenshot")) {
+                State->screenshot = true;
+                SDL_SetWindowSize(MainWindow, State->screenshot_width, State->screenshot_height);
+            }
 
             ImGui::SliderFloat("4D Projection", &State->camera_4D[3], 105.f, 2000.f);
 
             if (ImGui::Button("Clear")) {
                 State->curves.clear();
                 State->surfaces.clear();
+            }
+
+            if (ImGui::Button("Pop")) {
+                State->surfaces.pop_back();
             }
         }
 
@@ -1127,6 +1137,10 @@ int main(int, char**)
     while(!done)
     {
         mainloop();
+        if (State->screenshot) {
+            State->screenshot = false;
+            SDL_SetWindowSize(MainWindow, 1920, 1080);
+        }
     }
 
     // Cleanup
